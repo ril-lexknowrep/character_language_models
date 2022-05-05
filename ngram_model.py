@@ -15,10 +15,11 @@ import math
 import random
 from io import StringIO
 from more_itertools import windowed, split_into, chunked
+from encode_characters import OutputEncoder
 
 MAX_SEGMENT_LENGTH = 4
 NUMBER_OF_SEGMENTS = 10000
-CORPUS_DIR = '/home/pgergo/lexknowrep/lstm_input/'
+CORPUS_DIR = 'lstm_input'
 
 FORWARD_OUTPUT_FILE = 'ngram-forward.model'
 BACKWARD_OUTPUT_FILE = 'ngram-backward.model'
@@ -28,10 +29,9 @@ def main():
     Train a forward and a backward ngram model on a
     corpus consisting of plain text files.
     '''
-    from encode_characters import OutputEncoder
 
     output_enc = OutputEncoder()
-    output_enc.load('lexknowrep/output_encoder.pickle')
+    output_enc.load('output_encoder.pickle')
 
     trie_forward = MultiNgramTrieRoot(output_enc, 5)
     trie_backward = MultiNgramTrieRoot(output_enc, 5)
@@ -190,6 +190,9 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         The ML estimates and bigram approximations are normalised
         to sum to 1 to yield a proper probability distribution.
         '''
+        if len(ngram) > self.n:
+            return self.backoff_alternatives(ngram)
+
         if len(ngram) == 1:
             return self.unigram_freqs
         
@@ -230,6 +233,10 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         Instead in this case the estimate backs off to the final n-1-gram,
         which should yield a more reasonable estimate.
         '''
+        if len(ngram) > self.n:
+            if verbose:
+                print(ngram, "is longer than the model's order,",
+                      "estimating for", ngram[1:])
         if self.prefix_count(ngram[:-1]) == 0:
             if verbose:
                 print(ngram[:-1], "not seen in corpus,",
@@ -252,7 +259,7 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         else:
             return self.estimate_alternatives(ngram)
 
-    def predict_next(self, ngram, m):
+    def predict_next(self, ngram, m=1):
         '''
         Return the m most likely next characters given the
         preceding ngram.

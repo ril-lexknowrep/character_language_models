@@ -6,7 +6,7 @@ from more_itertools import windowed
 DEFAULT_BATCH_SIZE=256
 
 class BiLSTM_Model:
-    '''Class for bidirectional multi-n-gram language models.'''
+    '''Class for bidirectional LSTM language models.'''
 
     def __init__(self, input_encoder, output_encoder,
                  left_context, right_context,
@@ -27,26 +27,26 @@ class BiLSTM_Model:
 
         backward_layer = tf.keras.layers.LSTM(lstm_units,
                                               name="lstm_backward",
-                                              gobackwards=True)(input_right)
+                                              go_backwards=True)(input_right)
         backward_model = tf.keras.Model(inputs=input_right,
                                         outputs=backward_layer)
 
         bidirectional = tf.keras.layers.Concatenate()([forward_model.output,
                                                       backward_model.output])
-        dense = tf.keras.layers.Dense(hidden_neurons,
+        dense = tf.keras.layers.Dense(dense_neurons,
                                        activation="relu")(bidirectional)
         dropout = tf.keras.layers.Dropout(dropout_ratio)(dense)
         output_classifier = tf.keras.layers.Dense(output_encoder.code_dimension,
                                                   name="output",
                                                   activation="softmax")(dropout)
 
-        bilstm_model = tf.keras.Model(inputs=[forward_model.input,
+        self.model = tf.keras.Model(inputs=[forward_model.input,
                                               backward_model.input],
                                       outputs=output_classifier)
 
-        print(bilstm_model.summary())
+        self.model.summary()
 
-        bilstm_model.compile(loss='categorical_crossentropy',
+        self.model.compile(loss='categorical_crossentropy',
                              optimizer='adam',
                              metrics=['accuracy', PerElementPerplexity()],
                              run_eagerly=True)
@@ -63,16 +63,14 @@ class BiLSTM_Model:
                                     decay_steps=steps,
                                     end_learning_rate=1e-6,
                                     power=2)
-        bilstm_model.optimizer.learning_rate = learning_rate_fn
-
-        self.model = bilstm_model
+        self.model.optimizer.learning_rate = learning_rate_fn
 
         self.encoder = BiLSTM_Encoder(input_encoder, output_encoder,
                                       left_context=left_context,
                                       right_context=right_context)
 
     def train(self, texts, batch_size=DEFAULT_BATCH_SIZE,
-              validation_texts=None):
+              validation_texts=None, num_epochs=1):
         '''
         Train model on an iterable of texts. Each of these can be
         as short as single sentences or as long as documents,
@@ -80,7 +78,9 @@ class BiLSTM_Model:
         Validation on a fraction of the training data does not
         seem to be particularly informative, so an iterable of
         validation texts can be optionally passed on which the
-        model is validated after each training epoch.
+        model is validated after each training epoch. If such an
+        iterable is not provided, there is no validation after
+        training on each epoch.
         '''
         sequence_object = BiLSTM_Sequence(texts, batch_size,
                                               self.encoder)
@@ -91,40 +91,63 @@ class BiLSTM_Model:
                                                   batch_size,
                                                   self.encoder)
 
-        bilstm_model.fit(
+        self.model.fit(
             x=sequence_object,
             validation_data=validation_sequence,
-            epochs=1
+            epochs=num_epochs
         )
 
-    def predict_on_string(self, string, target_index):
+    def predict_on_string(self, string, target_index=None):
         '''
         Get model's predictions for all possible output characters at position
-        target_index in the specified string.
+        target_index in the specified string as a Numpy array.
+        If either the part of the string to the left or to the right of the
+        target is longer than the left and right context parameter of the model
+        respectively, then their final and initial substrings of the appropriate
+        length are used respectively.
         If either the part of the string to the left of the target is shorter
         than the model's left context parameter, or the part to the right is
         shorter than the right context parameter, then the necessary number of
         padding characters are added to the string at the beginning and/or
         the end.
         '''
+        if target_index == None:
+            target_index = self.encoder.left_context
+
         left_string = string[:target_index]
         left_string = left_string[-(self.encoder.left_context):]
-        left_string = ((self.encoder.left_context - len(left_string)) *
-                                                self.encoder.padding_char +
+        left_padding_len = max(0, self.encoder.left_context - len(left_string))
+        left_string = (left_padding_len * self.encoder.padding_char +
                        left_string)
 
         right_string = string[target_index + 1:]
-        right_string = right_string[-(self.encoder.right_context):]
+        right_string = right_string[:self.encoder.right_context]
+        right_padding_len = max(0, self.encoder.right_context - len(right_string))
         right_string = (right_string +
-                        (self.encoder.right_context - len(right_string)) *
-                                                self.encoder.padding_char)
+                        right_padding_len * self.encoder.padding_char)
 
         target = string[target_index]
 
         string = left_string + target + right_string
         left_X, right_X, _ = self.encoder.encode(string, padded=False)
 
-        return self.model.predict(x=[left_X, right_X])
+        preds = self.model.predict(x=[left_X, right_X])[0]
+
+        preds[preds < PerElementPerplexity.PROB_FLOOR] =\
+                                            PerElementPerplexity.PROB_FLOOR
+
+        return preds
+
+    def estimate_alternatives(self, string, target_index=None):
+        '''
+        Return a dict containing all possible output characters as keys
+        and the probability of their occurrence at the target index as
+        estimated by the model as the corresponding values.
+        '''
+        target_pred = self.predict_on_string(string, target_index)
+        return {self.encoder.code_to_character[i]: prob
+                                                for i, prob
+                                                in enumerate(target_pred)}
 
     def predict_next(self, left_string, right_string, m=1):
         '''
@@ -154,11 +177,9 @@ class BiLSTM_Model:
         Estimate the probability of the element of the input_string at
         position target_index (by default, the element after the left context
         window).
-        If either the part of the string to the left of the target is shorter
-        than the model's left context parameter, or the part to the right is
-        shorter than the right context parameter, then the necessary number of
-        padding characters are added to the string at the beginning and/or
-        the end.
+        See the docstring of predict_on_string on the handling of strings
+        that are longer or shorter on either side of the target than the
+        length of the context expected by the model.
         '''
         if target_index is None:
             target_index = self.encoder.left_context
@@ -173,6 +194,9 @@ class BiLSTM_Model:
         Returns the *most likely* target element given the left and right
         context along with the estimated probability of the *actual*
         target element.
+        See the docstring of predict_on_string on the handling of strings
+        that are longer or shorter on either side of the target than the
+        length of the context expected by the model.
         '''
         if target_index is None:
             target_index = self.encoder.left_context
@@ -204,19 +228,19 @@ class BiLSTM_Model:
 
         num_predictions = len(y)
 
-        preds = self.bilstm_model.predict(x=[left_X, right_X])
+        preds = self.model.predict(x=[left_X, right_X])
         preds_numeric = preds.argmax(axis=1)
 
         correct_guesses = sum(y_numeric == preds_numeric)
 
         true_probs = np.max(y * preds, axis=1)
         true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\
-                                     self.PerElementPerplexity.PROB_FLOOR
+                                     PerElementPerplexity.PROB_FLOOR
 
-        sum_of_logs = np.log2(true_probs).sum()
+        sum_of_logs = -np.log2(true_probs).sum()
 
         if print_string:
-            print(self.encoder.decode(y))
+            print(self.encoder.decode(preds))
 
         return (correct_guesses / num_predictions,      # accuracy
                 2 ** (sum_of_logs / num_predictions))   # perplexity
@@ -226,17 +250,17 @@ class BiLSTM_Model:
                           self.encoder.right_context - 1):
             raise ValueError('Input string "' + string + '" is too short.')
 
-        left_X, right_X, y = self.encoder.encode(string, padded=padded)
+        left_X, right_X, y = self.encoder.encode(string, padded=False)
 
         num_predictions = len(y)
 
-        preds = self.bilstm_model.predict(x=[left_X, right_X])
+        preds = self.model.predict(x=[left_X, right_X])
 
         true_probs = np.max(y * preds, axis=1)
         true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\
-                                     self.PerElementPerplexity.PROB_FLOOR
+                                     PerElementPerplexity.PROB_FLOOR
 
-        sum_of_logs = np.log2(true_probs).sum()
+        sum_of_logs = -np.log2(true_probs).sum()
 
         return (2 ** (sum_of_logs / num_predictions))
 
@@ -349,8 +373,8 @@ class BiLSTM_Encoder:
             # Going backward on the right is intuitively correct and
             # in technical terms essentially entails that the memory of the
             # element closest to the target is the freshest.
-#            right_X = np.array(list(map(np.array, right_windows)))
-            
+
+#            right_X = np.array(list(map(np.array, right_windows)))        
             right_X = np.array(list(map(lambda x : np.array(x)[::-1], right_windows)))
 
             # Regardless of whether the input sequence was padded or not,
@@ -394,7 +418,7 @@ class BiLSTM_Encoder:
 
     def output_to_numeric(self, output_char):
         '''Get numeric output code of a single character.'''
-        return self.output_encoder.num_code_dict.get(character, 0)
+        return self.output_encoder.num_code_dict.get(output_char, 0)
 
 
 class BiLSTM_Sequence(tf.keras.utils.Sequence):
@@ -482,6 +506,9 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
                                 self.encoder.input_encoder.code_dimension])
             y = np.zeros([remaining_elements,
                           self.encoder.output_encoder.code_dimension])
+            
+            # Set end_text and end_pos so that the last text
+            # is processed completely.
             end_text, end_pos = len(self.texts), 0
         else:
             # end_text inclusive, end_pos non-inclusive
@@ -505,7 +532,6 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
                                 call_by_reference=(left_X, right_X, y),
                                 padded=False)
             window_index = self.text_lengths[start_text] - start_pos
-            batch_text = self.texts[start_text][start_pos:]
 
             for j in range(start_text + 1, end_text):
                 self.encoder.encode(self.texts[j],
@@ -513,16 +539,21 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
                                     start=window_index,
                                     padded=False)
                 window_index += self.text_lengths[j]
-                batch_text += self.texts[j]
 
-            if end_text < len(self.texts):
+            if end_pos != 0:
+                # end_pos is 0 if the start of the following batch
+                # coincides with the start of the next text, or if there
+                # is no next text at all (i.e. this is the end of the last
+                # batch, since in that case end_text was set the number of
+                # texts and end_pos to 0).
+                # The text before end_text has been processed at the end of
+                # the previous for loop, so if end_pos is 0, this batch is
+                # already complete at this point.
                 self.encoder.encode(self.texts[end_text][:end_pos +
                                                        self.context_length],
                                     call_by_reference=(left_X, right_X, y),
                                     start=window_index,
                                     padded=False)
-                batch_text += self.texts[end_text][:end_pos +
-                                                       self.context_length]
 
         return ([left_X, right_X], y)
 

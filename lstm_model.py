@@ -3,7 +3,18 @@ import numpy as np
 import tensorflow as tf
 from more_itertools import windowed
 
-DEFAULT_BATCH_SIZE=256
+DEFAULT_BATCH_SIZE = 256
+
+# Validation always uses a large batch size as set here.
+# If Tensorflow runs out of memory at the validation stage
+# during training, which can happen if LSTM and dense
+# layer dimensions are set to high values, reduce this
+# number until the validation runs correctly.
+# This value considerably affects the speed at which
+# validation is carried out at the end of each call of
+# the train() method, so don't set it much lower
+# than what is absolutely necessary for stability.
+VALIDATION_BATCH_SIZE = 8192
 
 class BiLSTM_Model:
     '''Class for bidirectional LSTM language models.'''
@@ -11,8 +22,9 @@ class BiLSTM_Model:
     def __init__(self, input_encoder, output_encoder,
                  left_context, right_context,
                  lstm_units=64, dense_neurons=64,
-                 dropout_ratio=0.5):
-        # Configure bidirectional LST model
+                 dropout_ratio=0.5,
+                 verbose=True):
+        # Configure bidirectional LSTM model
         input_left = tf.keras.Input(shape=(left_context,
                                            input_encoder.code_dimension),
                                     name="input_left")
@@ -44,7 +56,8 @@ class BiLSTM_Model:
                                               backward_model.input],
                                       outputs=output_classifier)
 
-        self.model.summary()
+        if verbose:
+            self.model.summary()
 
         self.model.compile(loss='categorical_crossentropy',
                              optimizer='adam',
@@ -53,21 +66,67 @@ class BiLSTM_Model:
         # run_eagerly is required for the .numpy() function in the
         # perplexity metric function to work.
 
-        # Decay learning rate gradually from 1e-4 to 1e-6 until a total of
-        # about 100 million characters have been trained on.
-
-        STOP_DECAY_AFTER = 1e8
-        steps = STOP_DECAY_AFTER // DEFAULT_BATCH_SIZE
-        learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(
-                                    initial_learning_rate=1e-4,
-                                    decay_steps=steps,
-                                    end_learning_rate=1e-6,
-                                    power=2)
-        self.model.optimizer.learning_rate = learning_rate_fn
+        self.model.optimizer.learning_rate = BiLSTM_Model.learning_rate_decay()
 
         self.encoder = BiLSTM_Encoder(input_encoder, output_encoder,
                                       left_context=left_context,
                                       right_context=right_context)
+
+    def learning_rate_decay():
+        # Decay learning rate gradually from 1e-3 to 1e-5 until a total of
+        # about STOP_DECAY_AFTER characters have been trained on.
+        # Note that in one iteration the optimizer processes a whole batch,
+        # so the specified number of characters needs to be divided by
+        # the batch size to get the number of iterations in which the
+        # learning rate will decay.
+
+        STOP_DECAY_AFTER = 2e9
+        steps = STOP_DECAY_AFTER // DEFAULT_BATCH_SIZE
+        return tf.keras.optimizers.schedules.PolynomialDecay(
+                                    initial_learning_rate=1e-3,
+                                    decay_steps=steps,
+                                    end_learning_rate=1e-5,
+                                    power=2)
+
+    def load(model_file, input_encoder, output_encoder):
+        saved_model = tf.keras.models.load_model(model_file,
+                                custom_objects={"PerElementPerplexity":
+                                                PerElementPerplexity})
+
+        left_context = saved_model.inputs[0].shape[1]
+        right_context = saved_model.inputs[1].shape[1]
+        input_dim = saved_model.inputs[0].shape[2]
+        output_dim = saved_model.outputs[0].shape[1]
+
+        assert input_encoder.code_dimension == input_dim
+        assert output_encoder.code_dimension == output_dim
+
+        saved_optimizer = saved_model.optimizer
+
+        saved_model.compile(loss='categorical_crossentropy',
+                             optimizer='adam',
+                             metrics=['accuracy', PerElementPerplexity()],
+                             run_eagerly=True)
+        # Compile creates a new optimizer, so data on training progress,
+        # particularly the number of iterations so far, is lost.
+        saved_model.optimizer = saved_optimizer
+
+        return_model = BiLSTM_Model(input_encoder,
+                                    output_encoder,
+                                    left_context,
+                                    right_context,
+                                    verbose=False)
+        return_model.model = saved_model
+        
+        return_model.model.optimizer.learning_rate =\
+                                    BiLSTM_Model.learning_rate_decay()
+
+        print("Loaded model:")
+        return_model.model.summary()
+        print("Trained for", int(return_model.model.optimizer.iterations),
+              "iterations")
+
+        return return_model
 
     def train(self, texts, batch_size=DEFAULT_BATCH_SIZE,
               validation_texts=None, num_epochs=1):
@@ -88,7 +147,7 @@ class BiLSTM_Model:
         validation_sequence = None
         if validation_texts:
             validation_sequence = BiLSTM_Sequence(validation_texts,
-                                                  batch_size,
+                                                  VALIDATION_BATCH_SIZE,
                                                   self.encoder)
 
         self.model.fit(
@@ -374,8 +433,7 @@ class BiLSTM_Encoder:
             # in technical terms essentially entails that the memory of the
             # element closest to the target is the freshest.
 
-#            right_X = np.array(list(map(np.array, right_windows)))        
-            right_X = np.array(list(map(lambda x : np.array(x)[::-1], right_windows)))
+            right_X = np.array(list(map(np.array, right_windows)))
 
             # Regardless of whether the input sequence was padded or not,
             # all target characters are preceded by a left and a right context.
@@ -389,10 +447,8 @@ class BiLSTM_Encoder:
             # left_X, right_X and y
             call_by_reference[0][start:start + sequence_length] =\
                                             list(map(np.array, left_windows))
-#            call_by_reference[1][start:start + sequence_length] =\
-#                                            list(map(np.array, right_windows))
             call_by_reference[1][start:start + sequence_length] =\
-                                            list(map(lambda x : np.array(x)[::-1], right_windows))
+                                            list(map(np.array, right_windows))
             call_by_reference[2][start:start + sequence_length] =\
                         list(map(self.output_encoder.encode,
                              sequence[self.left_context:-self.right_context]))

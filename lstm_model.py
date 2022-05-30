@@ -67,6 +67,7 @@ class BiLSTM_Model:
         # perplexity metric function to work.
 
         self.model.optimizer.learning_rate = BiLSTM_Model.learning_rate_decay()
+        self.model.optimizer.clipnorm = 1.0
 
         self.encoder = BiLSTM_Encoder(input_encoder, output_encoder,
                                       left_context=left_context,

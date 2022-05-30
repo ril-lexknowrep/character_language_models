@@ -13,9 +13,9 @@ BATCH_SIZE = 256
 LEFT_CONTEXT_WIDTH = 15
 RIGHT_CONTEXT_WIDTH = 15
 MAX_SEGMENT_LENGTH = 4 # max number of text lines to be combined into one segment.
-LINES_PER_BATCH = 30000
+LINES_PER_ITERATION = 60000
 
-CORPUS_DIR = '/home/pgergo/lexknowrep/lstm_input/'
+CORPUS_DIR = '/home/pgergo/lexknowrep/lstm_input/' # change to corpus directory
 
 VALIDATION_FILES = ['test_files/2.press_hu_promenad_003_2011.txt']
 
@@ -44,8 +44,11 @@ def main():
                                            lstm_units=512,
                                            dense_neurons=512)
 
-    #bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_256.h5',
-    #                                            input_enc, output_enc)
+#   Uncomment the two lines below if resuming training.
+#   Adjust file name, starting_line and total_processed_chars if applicable.
+
+#    bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_512.h5',
+#                                                input_enc, output_enc)
 
     # This is the number of the first line that is read from each input file.
     # All lines before it are skipped. Can be used to resume processing
@@ -71,7 +74,7 @@ def main():
             print('All files have been processed')
             break
 
-        lines_per_file = LINES_PER_BATCH // len(corpus_files)
+        lines_per_file = LINES_PER_ITERATION // len(corpus_files)
 
         line_sum = 0
         input_text_lengths = []

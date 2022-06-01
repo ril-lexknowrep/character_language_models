@@ -1,0 +1,6 @@
+tensorflow
+numpy
+pandas
+more_itertools
+pyyaml
+h5py

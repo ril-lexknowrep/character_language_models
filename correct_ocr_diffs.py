@@ -10,7 +10,7 @@ INPUT_ENCODER_FILE = "input_encoder.pickle"
 OUTPUT_ENCODER_FILE = "output_encoder.pickle"
 LANGUAGE_MODEL = 'bilstm_model_512.h5'
 
-LOG_FILE = 'correct_ocr_diffs.log'
+LOG_FILE = sys.argv[3] + '.log'
 
 # Az alábbit lényegében innen loptam, de átírtam, kiegészítettem:
 # https://github.com/tamvar/OCR-cleaning/blob/master/arcanum_lanc/py3bs/nlp/corr/spelling.py
@@ -92,6 +92,9 @@ def main():
 
     alternatives = None
     for i, seg in enumerate(segs):
+
+        print(seg, file=log_file)
+
         if alternatives is None:
             if seg.tag == 'equal':
                 done_string += seg.a_segment
@@ -185,7 +188,7 @@ def main():
                 annotated_alternatives = new_annotated
 
     output_file = open(sys.argv[3], 'w', encoding='utf-8')
-    output_file.write(done_string)
+    print(done_string, file=output_file)
 
 
 def evaluate_alternatives(alternatives, annotated_alternatives,
@@ -196,7 +199,7 @@ def evaluate_alternatives(alternatives, annotated_alternatives,
     results, and return the alternative substring with the
     best perplexity score.
     '''
-    log_file.write('Alternatives:\n')
+    print('Alternatives:', file=log_file)
     best_perplexity = np.inf
     best_index = 0
     for i, (key, value) in enumerate(alternatives.items()):
@@ -205,13 +208,13 @@ def evaluate_alternatives(alternatives, annotated_alternatives,
             best_index = i
             best_perplexity = perplexity
             best_key = key
-        log_file.write('\t'.join([key,
+        print('\t'.join([key,
                          str(perplexity),
                          list(annotated_alternatives.values())[i]
-                         ]) + '\n')
-    log_file.write(f"Best:\t{best_key}\t" +
+                         ]), file=log_file)
+    print(f"Best:\t{best_key}\t" +
                    list(annotated_alternatives.values())[best_index] +
-                   '\n\n')
+                   '\n\n========\n', file=log_file)
     return list(alternatives.values())[best_index]
 
 
@@ -240,6 +243,19 @@ class DiffSegment:
         self.b_end = b_end
         self.a_segment = a_text[a_start:a_end]
         self.b_segment = b_text[b_start:b_end]
+
+    def __str__(self):
+        s = self
+        msg = f'\n{s.tag}'
+
+        if s.tag == 'equal':
+            msg += (f'\n{s.a_start}..{s.a_end} / ' +
+                    f'{s.b_start}..{s.b_end} = {s.b_segment}')
+        else: # replace, insert, delete
+            msg += (f'\n{s.a_start}..{s.a_end} = {{{s.a_segment}}}' +
+                    f'\n{s.b_start}..{s.b_end} = {{{s.b_segment}}}')
+
+        return msg
 
 
 if __name__ == '__main__':

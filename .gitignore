@@ -1,0 +1,11 @@
+venv
+
+ngram_backward.model
+ngram_forward.model
+
+test_files/1.press_hu_nem_007.txt
+test_files/1.press_hu_nem_009.txt
+test_files/2.press_hu_nem_004_1998.txt
+test_files/2.press_hu_promenad_003_2010.txt
+test_files/2.press_hu_promenad_003_2011.txt
+

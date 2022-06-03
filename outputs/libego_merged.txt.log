@@ -1,0 +1,173 @@
+
+equal
+0..25 / 0..25 = Szombattól újra jár a zug
+
+replace
+25..28 = {lig}
+25..28 = {fif}
+
+equal
+28..35 / 28..35 = eti lib
+
+replace
+35..36 = {e}
+35..36 = {b}
+
+equal
+36..53 / 36..53 = gő, amit egy hóna
+Alternatives:
+aa	1.6646980863142635	 újra jár a zug{lig}eti lib{e}gő, amit egy hón
+ab	79.76971383784628	 újra jár a zug{lig}eti lib{b}gő, amit egy hón
+ac	52.102410816723385	 újra jár a zug{lig}eti lib{ö}gő, amit egy hón
+ad	792.1906683597408	 újra jár a zug{lig}eti lib{c}gő, amit egy hón
+ae	122.12621183537401	 újra jár a zug{lig}eti lib{ó}gő, amit egy hón
+af	44.05379787532853	 újra jár a zug{lig}eti lib{õ}gő, amit egy hón
+ag	70.68922975134439	 újra jár a zug{lig}eti lib{ő}gő, amit egy hón
+ah	21.73844791781952	 újra jár a zug{lig}eti lib{é}gő, amit egy hón
+ai	14.593396045710257	 újra jár a zug{lig}eti lib{o}gő, amit egy hón
+aj	44.05379787532853	 újra jár a zug{lig}eti lib{ô}gő, amit egy hón
+ak	12.408054746629643	 újra jár a zug{lig}eti lib{lo}gő, amit egy hón
+al	5.428508145248154	 újra jár a zug{lig}eti lib{le}gő, amit egy hón
+am	2127.734514711646	 újra jár a zug{lig}eti lib{lc}gő, amit egy hón
+ba	36.51569898603145	 újra jár a zug{fif}eti lib{e}gő, amit egy hón
+bb	3349.944188054518	 újra jár a zug{fif}eti lib{b}gő, amit egy hón
+bc	1201.7194947201	 újra jár a zug{fif}eti lib{ö}gő, amit egy hón
+bd	21472.572983532144	 újra jár a zug{fif}eti lib{c}gő, amit egy hón
+be	2380.4629854496247	 újra jár a zug{fif}eti lib{ó}gő, amit egy hón
+bf	633.9442871524733	 újra jár a zug{fif}eti lib{õ}gő, amit egy hón
+bg	1577.3547556239218	 újra jár a zug{fif}eti lib{ő}gő, amit egy hón
+bh	556.8204114396397	 újra jár a zug{fif}eti lib{é}gő, amit egy hón
+bi	274.00296916431677	 újra jár a zug{fif}eti lib{o}gő, amit egy hón
+bj	633.9442871524733	 újra jár a zug{fif}eti lib{ô}gő, amit egy hón
+bk	190.9908744802224	 újra jár a zug{fif}eti lib{lo}gő, amit egy hón
+bl	108.18440654008832	 újra jár a zug{fif}eti lib{le}gő, amit egy hón
+bm	34051.822320203064	 újra jár a zug{fif}eti lib{lc}gő, amit egy hón
+Best:	aa	 újra jár a zug{lig}eti lib{e}gő, amit egy hón
+
+========
+
+
+replace
+53..58 = {pon á}
+53..58 = {con e}
+
+equal
+58..75 / 58..75 = t javítottak – kö
+Alternatives:
+a	1.0086708993539593	, amit egy hóna{pon á}t javítottak – k
+b	3190.306181585337	, amit egy hóna{con e}t javítottak – k
+Best:	a	, amit egy hóna{pon á}t javítottak – k
+
+========
+
+
+replace
+75..76 = {z}
+75..76 = {q}
+
+equal
+76..79 / 76..79 = ölt
+
+replace
+79..80 = {e}
+79..80 = {r}
+
+equal
+80..98 / 80..98 =  a BKV. A tizenkét
+Alternatives:
+aa	1.0000056227616978	javítottak – kö{z}ölt{e} a BKV. A tizenk
+ab	12104.616529510795	javítottak – kö{z}ölt{r} a BKV. A tizenk
+ac	298.5759753283914	javítottak – kö{z}ölt{ö} a BKV. A tizenk
+ad	2216.824715185886	javítottak – kö{z}ölt{c} a BKV. A tizenk
+ae	5081.790999697636	javítottak – kö{z}ölt{ó} a BKV. A tizenk
+af	531.7457727791782	javítottak – kö{z}ölt{õ} a BKV. A tizenk
+ag	317.4385407890638	javítottak – kö{z}ölt{ő} a BKV. A tizenk
+ah	108.09325175005813	javítottak – kö{z}ölt{é} a BKV. A tizenk
+ai	1496.9816390364992	javítottak – kö{z}ölt{o} a BKV. A tizenk
+aj	531.7457727791782	javítottak – kö{z}ölt{ô} a BKV. A tizenk
+ba	1413.2671396924284	javítottak – kö{q}ölt{e} a BKV. A tizenk
+bb	2252888.9461374725	javítottak – kö{q}ölt{r} a BKV. A tizenk
+bc	10508.986829484753	javítottak – kö{q}ölt{ö} a BKV. A tizenk
+bd	494527.0687590405	javítottak – kö{q}ölt{c} a BKV. A tizenk
+be	905267.9349974202	javítottak – kö{q}ölt{ó} a BKV. A tizenk
+bf	176013.47804465616	javítottak – kö{q}ölt{õ} a BKV. A tizenk
+bg	1425.749651809564	javítottak – kö{q}ölt{ő} a BKV. A tizenk
+bh	22720.712030266743	javítottak – kö{q}ölt{é} a BKV. A tizenk
+bi	92637.6394825247	javítottak – kö{q}ölt{o} a BKV. A tizenk
+bj	176013.47804465616	javítottak – kö{q}ölt{ô} a BKV. A tizenk
+ca	236.95473155638786	javítottak – kö{g}ölt{e} a BKV. A tizenk
+cb	31428.57315108742	javítottak – kö{g}ölt{r} a BKV. A tizenk
+cc	696.6718415210989	javítottak – kö{g}ölt{ö} a BKV. A tizenk
+cd	5051.8408638626215	javítottak – kö{g}ölt{c} a BKV. A tizenk
+ce	66519.55690719023	javítottak – kö{g}ölt{ó} a BKV. A tizenk
+cf	971.2504181956014	javítottak – kö{g}ölt{õ} a BKV. A tizenk
+cg	3153.4810062518745	javítottak – kö{g}ölt{ő} a BKV. A tizenk
+ch	209.57180376460875	javítottak – kö{g}ölt{é} a BKV. A tizenk
+ci	2285.9404825071324	javítottak – kö{g}ölt{o} a BKV. A tizenk
+cj	971.2504181956014	javítottak – kö{g}ölt{ô} a BKV. A tizenk
+da	257.2545325704642	javítottak – kö{y}ölt{e} a BKV. A tizenk
+db	24615.2267921836	javítottak – kö{y}ölt{r} a BKV. A tizenk
+dc	5963.595712753188	javítottak – kö{y}ölt{ö} a BKV. A tizenk
+dd	3433.9022192302336	javítottak – kö{y}ölt{c} a BKV. A tizenk
+de	18266.74445255741	javítottak – kö{y}ölt{ó} a BKV. A tizenk
+df	3443.759975814153	javítottak – kö{y}ölt{õ} a BKV. A tizenk
+dg	1029.1349303936868	javítottak – kö{y}ölt{ő} a BKV. A tizenk
+dh	923.1138932154	javítottak – kö{y}ölt{é} a BKV. A tizenk
+di	6101.0071185099305	javítottak – kö{y}ölt{o} a BKV. A tizenk
+dj	3443.759975814153	javítottak – kö{y}ölt{ô} a BKV. A tizenk
+Best:	aa	javítottak – kö{z}ölt{e} a BKV. A tizenk
+
+========
+
+
+replace
+98..99 = { }
+98..99 = {g}
+
+equal
+99..112 / 99..112 = évente esedék
+
+replace
+112..125 = {es rekonstruk}
+112..155 = {as rekonstrvkdió során elvégegték a pályaea}
+
+equal
+125..126 / 155..156 = c
+
+replace
+126..148 = {ió során elvégezték a }
+156..218 = {él sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek re}
+
+equal
+148..149 / 218..219 = p
+
+insert
+149..149 = {}
+219..252 = {edésgigsgálatát, átviqswáwták a p}
+Alternatives:
+a	46.773417167153674	BKV. A tizenkét{ }évente esedékas rekonstrvkdió során elvégegték a pályaeacél sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek repedésgigsgálatát,
+b	65.86628628210455	BKV. A tizenkét{g}évente esedékas rekonstrvkdió során elvégegték a pályaeacél sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek repedésgigsgálatát,
+c	71.37789853159217	BKV. A tizenkét{q}évente esedékas rekonstrvkdió során elvégegték a pályaeacél sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek repedésgigsgálatát,
+d	63.38427395066526	BKV. A tizenkét{y}évente esedékas rekonstrvkdió során elvégegték a pályaeacél sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek repedésgigsgálatát,
+Best:	a	BKV. A tizenkét{ }évente esedékas rekonstrvkdió során elvégegték a pályaeacél sqerrezeti elemeiaek és a szállítószékekfszorítófejegnek repedésgigsgálatát,
+
+========
+
+
+equal
+149..154 / 252..257 = álya 
+
+replace
+154..220 = {acél szerkezeti elemeinek és a szállítószékek szorítófejeinek repe}
+257..292 = {mozgó alkarrészeit, v3lamint rgzgés}
+
+equal
+220..221 / 292..293 = d
+
+replace
+221..328 = {ésvizsgálatát, átvizsgálták a pálya mozgó alkatrészeit, valamint rezgésdiagnosztikai vizsgálatot végeztek a}
+293..328 = {iagnoszthkai vizsgalatot végeztek s}
+
+equal
+328..368 / 328..368 =  szerkezeti elemekben lévő csapágyakon.
+

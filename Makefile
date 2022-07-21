@@ -27,3 +27,9 @@ filter_log:
 
 confusion_matrix:
 	python3 calculate_confusion_matrix.py
+
+# -----
+
+use_lm:
+	clear ; time python3 use_lm.py | grep -v "1/1"
+

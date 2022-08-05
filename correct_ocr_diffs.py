@@ -1,7 +1,6 @@
 import sys
 import os
 import difflib
-from types import SimpleNamespace
 from typing import Set, List
 
 import tensorflow as tf
@@ -95,9 +94,6 @@ def main():
         text_a = infile.read().replace('\t', ' ').rstrip()
     with open(sys.argv[2], encoding='utf-8') as infile:
         text_b = infile.read().replace('\t', ' ').rstrip()
-    texts = SimpleNamespace()
-    texts.a = text_a
-    texts.b = text_b
 
     output_file = open(sys.argv[3], 'w', encoding='utf-8')
     log_file = open(sys.argv[3] + '.log', 'w', encoding='utf-8')
@@ -145,19 +141,18 @@ def main():
 
             for beam in beams:
                 left_context = str(beam)
-                left_annotated = beam.annotated_str()
                 if len(left_context) < left_window:
                     # add sufficient left padding
                     left_context = (input_enc.PADDING_CHAR
                                     * (left_window - len(left_context))
                                     + left_context)
 
-                right_contexts = {texts.a[seg.a_end:
-                                          seg.a_end + right_window
-                                          + MEASURE_RIGHT_CONTEXT],
-                                  texts.b[seg.b_end:
-                                          seg.b_end + right_window
-                                          + MEASURE_RIGHT_CONTEXT]}
+                right_contexts = {text_a[seg.a_end:
+                                         seg.a_end + right_window
+                                         + MEASURE_RIGHT_CONTEXT],
+                                  text_b[seg.b_end:
+                                         seg.b_end + right_window
+                                         + MEASURE_RIGHT_CONTEXT]}
 
                 if any(len(rc) < right_window for rc in right_contexts):
                     # add sufficient right padding
@@ -173,9 +168,11 @@ def main():
                         eval_string = left_context + alt + right_ctxt
                         perplexity = bilstm_model\
                             .metrics_on_string(eval_string)[1]
-                        print('\t'.join([beam.path + key,
+                        good_label = ('+' if perplexity < BEAM_MAX_PERPLEXITY
+                                      else '')
+                        print('\t'.join([good_label + beam.path + key,
                                          str(perplexity),
-                                         left_annotated + '{' + alt + '}'
+                                         beam.annotated + '{' + alt + '}'
                                          + right_ctxt]),
                               file=log_file)
                         right_perplexities.append(perplexity)
@@ -186,6 +183,13 @@ def main():
                                   key=lambda x: beam_to_perpl[x])
             for b in sorted_beams:
                 print(b, beam_to_perpl[b], file=debug_file)
+
+            print('\nBest:',
+                  '\t'.join([sorted_beams[0],
+                             str(beam_to_perpl[sorted_beams[0]]),
+                             Beam(beam_start, segs, sorted_beams[0],
+                                  beams[0].prefix).annotated]),
+                  file=log_file)
 
             if beam_to_perpl[sorted_beams[0]] > BEAM_MAX_PERPLEXITY:
                 sorted_beams = [sorted_beams[0]]
@@ -345,7 +349,8 @@ class Beam:
                                            self.start_segment + len(self)],
                              self.path))
 
-    def annotated_str(self):
+    @property
+    def annotated(self):
         return self.prefix \
             + ''.join(seg[letter] if letter == '_'
                       else '{' + seg[letter] + '}'

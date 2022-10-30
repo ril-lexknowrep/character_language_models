@@ -10,12 +10,15 @@ import lstm_model
 from encode_characters import InputEncoder, OutputEncoder
 
 BATCH_SIZE = 256
-LEFT_CONTEXT_WIDTH = 15
-RIGHT_CONTEXT_WIDTH = 15
+LEFT_CONTEXT_WIDTH = 30
+RIGHT_CONTEXT_WIDTH = 30
+LSTM_UNITS = 1024
+DENSE_DIM = 512
 MAX_SEGMENT_LENGTH = 4 # max number of text lines to be combined into one segment.
 LINES_PER_ITERATION = 60000
+MODEL_FILE_NAME = 'bilstm_model_512_compare_no_dropout_2_lstms_768-384-w30.h5'
 
-CORPUS_DIR = '/home/pgergo/lexknowrep/lstm_input/' # change to corpus directory
+CORPUS_DIR = '/home/pgergo/ds_lexknowrep/lexknowrep/lstm_input/random_subset/' # change to corpus directory
 
 VALIDATION_FILES = ['test_files/2.press_hu_promenad_003_2011.txt']
 
@@ -39,10 +42,10 @@ def main():
 
     bilstm_model = lstm_model.BiLSTM_Model(input_encoder=input_enc,
                                            output_encoder=output_enc,
-                                           left_context=15,
-                                           right_context=15,
-                                           lstm_units=512,
-                                           dense_neurons=512)
+                                           left_context=LEFT_CONTEXT_WIDTH,
+                                           right_context=RIGHT_CONTEXT_WIDTH,
+                                           lstm_units=LSTM_UNITS,
+                                           dense_neurons=DENSE_DIM)
 
 #   Uncomment the two lines below if resuming training.
 #   Adjust file name, starting_line and total_processed_chars if applicable.
@@ -107,7 +110,7 @@ def main():
         bilstm_model.train(epoch_texts,
                            validation_texts=validation_texts)
 
-        bilstm_model.model.save('bilstm_model_512.h5')
+        bilstm_model.model.save(MODEL_FILE_NAME)
 
         # Tensorflow leaks gigabytes of RAM over the course of a couple
         # million of training batches, so without explicit garbage

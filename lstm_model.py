@@ -1,9 +1,13 @@
 import math
 import numpy as np
+import datetime
+
 import tensorflow as tf
 from more_itertools import windowed
 
 DEFAULT_BATCH_SIZE = 256
+LSTM1 = 768
+LSTM2 = 384
 
 # Validation always uses a large batch size as set here.
 # If Tensorflow runs out of memory at the validation stage
@@ -33,24 +37,38 @@ class BiLSTM_Model:
                                     name="input_right")
 
         forward_layer = tf.keras.layers.LSTM(lstm_units,
-                                             name="lstm_forward")(input_left)
+#        forward_layer, forward_memory, forward_carry = tf.keras.layers.LSTM(lstm_units,
+                                             name="lstm_forward",
+#                                             return_sequences=True,
+#                                             return_state=True
+                                             )(input_left)
+#        forward_layer = tf.keras.layers.LSTM(LSTM2,
+#                                             name="lstm_forward2")(forward_layer)
         forward_model = tf.keras.Model(inputs=input_left,
                                        outputs=forward_layer)
 
         backward_layer = tf.keras.layers.LSTM(lstm_units,
+#        backward_layer, backward_memory, backward_carry = tf.keras.layers.LSTM(lstm_units,
                                               name="lstm_backward",
+#                                              return_sequences=True,
+#                                              return_state=True,
                                               go_backwards=True)(input_right)
+#        backward_layer = tf.keras.layers.LSTM(LSTM2,
+#                                             name="lstm_backward2")(backward_layer)
         backward_model = tf.keras.Model(inputs=input_right,
                                         outputs=backward_layer)
 
         bidirectional = tf.keras.layers.Concatenate()([forward_model.output,
-                                                      backward_model.output])
+                                                       backward_model.output])
+ #       bidirectional = tf.keras.layers.Concatenate()([forward_model.output, forward_memory,
+ #                                                     backward_model.output, backward_memory])
         dense = tf.keras.layers.Dense(dense_neurons,
                                        activation="relu")(bidirectional)
-        dropout = tf.keras.layers.Dropout(dropout_ratio)(dense)
+#        dropout = tf.keras.layers.Dropout(dropout_ratio)(dense)
         output_classifier = tf.keras.layers.Dense(output_encoder.code_dimension,
                                                   name="output",
-                                                  activation="softmax")(dropout)
+#                                                  activation="softmax")(dropout)
+                                                  activation="softmax")(dense)
 
         self.model = tf.keras.Model(inputs=[forward_model.input,
                                               backward_model.input],
@@ -151,10 +169,16 @@ class BiLSTM_Model:
                                                   VALIDATION_BATCH_SIZE,
                                                   self.encoder)
 
+        log_dir = "logs/fit/" \
+            + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = tf.keras.\
+            callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
         self.model.fit(
             x=sequence_object,
             validation_data=validation_sequence,
-            epochs=num_epochs
+            epochs=num_epochs,
+            callbacks=[tensorboard_callback]
         )
 
     def predict_on_string(self, string, target_index=None):

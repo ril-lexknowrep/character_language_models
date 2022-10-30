@@ -31,5 +31,5 @@ confusion_matrix:
 # -----
 
 use_lm:
-	clear ; time python3 use_lm.py | grep -v "1/1"
+	clear ; time python3 use_lm.py | grep -v "1/1" > use_lm.log
 

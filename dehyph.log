@@ -1,0 +1,66 @@
+Encoder created. Left context width: 15 Right context width: 15
+Input encoding dimension: 80 Target encoding dimension: 113
+Loaded model:
+Model: "model_2"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to                     
+==================================================================================================
+ input_left (InputLayer)        [(None, 15, 80)]     0           []                               
+                                                                                                  
+ input_right (InputLayer)       [(None, 15, 80)]     0           []                               
+                                                                                                  
+ lstm_forward (LSTM)            (None, 512)          1214464     ['input_left[0][0]']             
+                                                                                                  
+ lstm_backward (LSTM)           (None, 512)          1214464     ['input_right[0][0]']            
+                                                                                                  
+ concatenate (Concatenate)      (None, 1024)         0           ['lstm_forward[0][0]',           
+                                                                  'lstm_backward[0][0]']          
+                                                                                                  
+ dense (Dense)                  (None, 512)          524800      ['concatenate[0][0]']            
+                                                                                                  
+ dropout (Dropout)              (None, 512)          0           ['dense[0][0]']                  
+                                                                                                  
+ output (Dense)                 (None, 113)          57969       ['dropout[0][0]']                
+                                                                                                  
+==================================================================================================
+Total params: 3,011,697
+Trainable params: 3,011,697
+Non-trainable params: 0
+__________________________________________________________________________________________________
+Trained for 15279925 iterations
+
+döbbenetes élményeire. A fut- ballpálya négyszögében létünk
+24.990111861366984
+
+döbbenetes élményeire. A fut-ballpálya négyszögében létünk
+22.92773441477235
+
+döbbenetes élményeire. A futballpálya négyszögében létünk
+10.865480048168946
+
+színvonaláról, az szíveskedjen egyszer- kétszer elolvasni a személyes
+8.943118029551727
+
+színvonaláról, az szíveskedjen egyszer-kétszer elolvasni a személyes
+7.499156797617645
+
+színvonaláról, az szíveskedjen egyszerkétszer elolvasni a személyes
+7.884260493672944
+
+annyi éven át én és a többi másod- és harmadrendű statiszta ebben
+8.878049059159157
+
+annyi éven át én és a többi másod-és harmadrendű statiszta ebben
+9.50803375902776
+
+annyi éven át én és a többi másodés harmadrendű statiszta ebben
+10.76504228969388
+
+hogy a körfrekvencián a másod- percenkénti radiánokat értjük
+17.742606710894815
+
+hogy a körfrekvencián a másod-percenkénti radiánokat értjük
+17.58243851385175
+
+hogy a körfrekvencián a másodpercenkénti radiánokat értjük
+16.756040040831984

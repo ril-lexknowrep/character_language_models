@@ -33,3 +33,6 @@ confusion_matrix:
 use_lm:
 	clear ; time python3 use_lm.py | grep -v "1/1" > use_lm.log
 
+dehyph:
+	clear ; time python3 dehyph.py | grep -v "1/1" > dehyph.log
+

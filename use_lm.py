@@ -44,20 +44,28 @@ y_best = []
 y_entr = []
 x_labels = []
 
+
+def char_prediction(text, target_index=0):
+    """Return best_char, best_prob and entropy for char at `text[target_index]`."""
+    res = bilstm_model.estimate_alternatives(text, target_index)
+
+    PROB = 1
+
+    entr = entropy([x[PROB] for x in res.items()])
+
+    tips = list(filter(lambda x: x[PROB] > TH,
+        sorted(res.items(), key=lambda x: x[PROB], reverse=True)))
+    best, best_prob = tips[0]
+
+    return best, best_prob, entr
+
+
 for ti in range(len(s)): # ti = target index = we estimate this char
 
-    res = bilstm_model.estimate_alternatives(s, ti)
-
-    entr = entropy([x[1] for x in res.items()])
+    best, best_prob, entr = char_prediction(s, ti)
 
     left = max(0, ti - ORDER)
     right = min(len(s), ti + 1 + ORDER)
-
-
-    tips = list(filter(lambda x: x[1] > TH,
-        sorted(res.items(), key=lambda x: x[1], reverse=True)))
-
-    best, best_prob = tips[0]
 
     msg = "OK" if best == s[ti] else "ERR!"
 

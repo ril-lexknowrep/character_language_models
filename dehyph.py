@@ -16,10 +16,7 @@ output_enc.load("output_encoder.pickle")
 bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_512.h5',
                                             input_enc, output_enc)
 
-ORDER = 15 # model order XXX how to get it from the loaded model?
 TH = 0.001 # minimum prob for a tip to consider
-
-TO_ESTIMATE = '●'
 
     
 def vis(char): 
@@ -39,11 +36,10 @@ def char_prediction(text, target_index=0):
         sorted(res.items(), key=lambda x: x[PROB], reverse=True)))
     best, best_prob = tips[0]
 
-    return best, best_prob, entr
+    return best, best_prob, entr, tips
 
 
 VERBOSE = False
-
 
 def main():
     """Main."""
@@ -65,11 +61,16 @@ def main():
         print()
         print(text)
 
-        sum_entr = 0 # XXX van ennél jobb mérőszám?
+        # XXX mi a jó mérőszám?
+        sum_entr = 0 # karakterenkénti entrópia összege
+        cnt_err = 0 # rossz előrejelzések száma
 
         for ti, char in enumerate(text): # ti = target index = we estimate this char
 
-            best, best_prob, entr = char_prediction(text, ti)
+            best, best_prob, entr, tips = char_prediction(text, ti)
+
+            if best != char:
+                cnt_err += 1
 
             sum_entr += entr
 
@@ -79,8 +80,10 @@ def main():
                 else:
                     msg, best_print = "ERR!", best
                 print(f'{vis(char)}\t{vis(best_print)}\t{best_prob:.4f}\t{entr:.4f}\t{msg}')
+                #print(f' {tips}')
 
-        print(sum_entr)
+        print(f'sum_entr={sum_entr}')
+        print(f'cnt_err={cnt_err}')
 
 
 if __name__ == '__main__':

@@ -13,7 +13,7 @@ from scipy.stats import entropy
 
 import tensorflow as tf
 import lstm_model
-from encode_characters import InputEncoder, OutputEncoder, character_to_features
+from encode_characters import InputEncoder, OutputEncoder
 
 
 def disable_print():
@@ -51,12 +51,10 @@ def main():
     # XXX itt szóbajön a difflib.SequenceMatcher(autojunk=False)
 
     # --- init model
-    input_enc = InputEncoder()
-    output_enc = OutputEncoder()
-    input_enc.load("input_encoder.pickle")
-    output_enc.load("output_encoder.pickle")
+    input_enc = InputEncoder(file="input_encoder.json")
+    output_enc = OutputEncoder(file="output_encoder.json")
     disable_print()
-    bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_512.h5',
+    bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_512_renamed.h5',
                                                 input_enc, output_enc)
     enable_print()
 

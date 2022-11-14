@@ -596,7 +596,8 @@ class BiLSTM_Model:
             preds = []
             for s in padded_seqs:
                 left_X, right_X, _ = self.encoder.encode(s, padded=False)
-                preds.append(self.model(x=[left_X, right_X], training=False))
+                preds.append(self.model([left_X, right_X],
+                             training=False).numpy())
             preds = np.array(preds)
 
         preds[preds < PerElementPerplexity.PROB_FLOOR] =\
@@ -677,7 +678,7 @@ class BiLSTM_Model:
             y = []
             for s in contexts:
                 left_X, right_X, _ = self.encoder.encode(s, padded=False)
-                y.append(self.model(x=[left_X, right_X], training=False))
+                y.append(self.model([left_X, right_X], training=False)).numpy()
             y = np.array(y)
 
         # encode the true characters in the target substrings
@@ -686,7 +687,7 @@ class BiLSTM_Model:
         yhat_numeric = []
         for c in joined_substrings:
             yhat.append(self.encoder.output_encoder.encode(c))
-            yhat_numeric.append(self.encoder.char_to_int(c))
+            yhat_numeric.append(self.encoder.output_encoder.to_int(c))
         yhat = np.array(yhat)
         yhat_numeric = np.array(yhat_numeric)
         y_numeric = y.argmax(axis=1)
@@ -840,7 +841,7 @@ class BiLSTM_Model:
         for c in sequence[self.encoder.left_context:
                           -self.encoder.right_context]:
             yhat.append(self.encoder.output_encoder.encode(c))
-            yhat_numeric.append(self.encoder.char_to_int(c))
+            yhat_numeric.append(self.encoder.output_encoder.to_int(c))
         num_predictions = len(yhat)
         yhat = np.array(yhat)
         yhat_numeric = np.array(yhat_numeric)
@@ -853,9 +854,12 @@ class BiLSTM_Model:
             y = self.model.predict(x=sequence_object)
         else:
             left_X, right_X, _ = self.encoder.encode(sequence, padded=False)
-            y = self.model(x=[left_X, right_X], training=False)
-
-        y_numeric = y.argmax(axis=1)
+            y = self.model([left_X, right_X], training=False).numpy()
+        import sys
+        try:
+            y_numeric = y.argmax(axis=1)
+        except AttributeError as err:
+            print(f"{y=}, ", err, file=sys.stderr)
         correct_guesses = sum(y_numeric == yhat_numeric)
 
         true_probs = np.max(yhat * y, axis=1)
@@ -879,7 +883,7 @@ class BiLSTM_Model:
 
         num_predictions = len(y)
 
-        preds = self.model(x=[left_X, right_X])
+        preds = self.model([left_X, right_X], training=False).numpy()
 
         true_probs = np.max(y * preds, axis=1)
         true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\

@@ -39,7 +39,7 @@ frequency threshold are therefore collapsed into a generic
 import os
 import sys
 import unicodedata
-import pickle
+import json
 
 import pandas as pd
 import numpy as np
@@ -50,8 +50,9 @@ from abc import ABC, abstractmethod
 FREQ_EXPONENT = 6
 INPUT_COUNT_THRESHOLD = 1000
 FEATURE_NAMES = ['normalised', 'letter', 'upper',
-                'long', 'other_diacritic',
-                'space', 'dash', 'digit']
+                 'long', 'other_diacritic',
+                 'space', 'dash', 'digit']
+
 
 def main():
     corpus_dir = sys.argv[1]
@@ -70,7 +71,7 @@ def main():
     characters = [i[0] for i in charcounter.most_common()]
 
     ch_features = [[ch, charcounter[ch]] + list(character_to_features(ch))
-                        for ch in characters]
+                   for ch in characters]
     dframe = pd.DataFrame(ch_features,
                           columns=['raw', 'count'] + FEATURE_NAMES)
     print("*" * 40)
@@ -92,7 +93,7 @@ def main():
         norm_char_freqs[norm_character] += character_freq
 
     norm_input_chars = list(ch for ch, freq in norm_char_freqs.items()
-                                    if freq > INPUT_COUNT_THRESHOLD)
+                            if freq > INPUT_COUNT_THRESHOLD)
 
     # OOV normalised input will be encoded as 0
     input_numeric_code = {ch: i + 1
@@ -109,49 +110,48 @@ def main():
 
     print("*" * 40)
     print("INPUT CHARACTER BINARY CODES:")
-    dframe = pd.DataFrame(chartable, index = characters)
+    dframe = pd.DataFrame(chartable, index=characters)
     print(dframe.to_string())
     print("*" * 40)
 
-    input_enc.save("input_encoder.pickle")
+    input_enc.save("input_encoder.json")
 
     # Rare output characters are identified as a generic OOV
     # character with code 0.
     total_char_count = sum(charcounter[ch] for ch in characters)
     count_threshold = total_char_count / 10 ** FREQ_EXPONENT
     output_chars = [ch for ch in characters
-                        if charcounter[ch] > count_threshold]
+                    if charcounter[ch] > count_threshold]
 
     # OOV output will be encoded as 0
     output_numeric_code = {ch: i + 1
-                          for i, ch in enumerate(output_chars)}
+                           for i, ch in enumerate(output_chars)}
 
     output_enc = OutputEncoder(output_numeric_code)
 
-    output_enc.save("output_encoder.pickle")
+    output_enc.save("output_encoder.json")
 
     print("OUTPUT CHARACTER BINARY CODES:")
     chartable = np.zeros([len(characters), output_enc.code_dimension], int)
 
     for i, character in enumerate(characters):
-        chartable[i,:] = output_enc.encode(character)
+        chartable[i, :] = output_enc.encode(character)
 
-    dframe = pd.DataFrame(chartable, index = characters)
+    dframe = pd.DataFrame(chartable, index=characters)
     print(dframe.to_string())
 
 
 class CharacterEncoder(ABC):
     '''Superclass for character encoders.'''
-    PADDING_CHAR = '\u0000'  # Unicode null character
 
-    def __init__(self, num_code_dict = {}):
+    def __init__(self, num_code_dict={}):
         '''
-        Construct object.
+        Initialise object.
         A dictionary object containing a numerical identifier
         for each character to be encoded should be supplied.
         The numerical identifier must have values
         between 0 and the number of classes - 1.
-        The constructor's dictionary object argument should
+        The initialiser's dictionary object argument should
         only be omitted if the encoder object will be used to load
         a saved encoder object state from file using the 'load'
         method.
@@ -170,45 +170,77 @@ class CharacterEncoder(ABC):
         return self.ch_encodings.items()
 
     def save(self, fname):
-        '''Save encoder state to a binary file'''
+        '''Save encoder state to a JSON file'''
         obj_state = [self.num_code_dict,
-                     self.one_hot_dimension,
                      self.code_dimension,
-                     self.ch_encodings]
-        with open(fname, 'wb') as save_file:
-            pickle.dump(obj_state, save_file)
+                     list(self.ch_encodings.keys())]
+        with open(fname, 'w') as save_file:
+            save_file.write(json.dumps(obj_state))
 
     def load(self, fname):
-        '''Load encoder state from a binary file'''
-        with open(fname, 'rb') as save_file:
-            obj_state = pickle.load(save_file)
-        (self.num_code_dict,
-         self.one_hot_dimension,
-         self.code_dimension,
-         self.ch_encodings) = obj_state
+        '''Load encoder state from a JSON file'''
+        with open(fname) as save_file:
+            (num_code_dict,
+             code_dimension,
+             ch_encodings_keys) = json.loads(save_file.read())
+        self.num_code_dict = num_code_dict
+        self.one_hot_dimension = len(num_code_dict) + 1
+        self.code_dimension = code_dimension
+        self.ch_encodings_keys = ch_encodings_keys
+        self.ch_encodings = {}
 
     @abstractmethod
     def encode(self, character):
-        '''
-        Return encoding for a character.
-        The superclass method returns a numpy zeros array
-        of the code dimension as the encoding of the padding
-        character.
-        '''
+        '''Return encoding for a character'''
         pass
 
 
 class InputEncoder(CharacterEncoder):
     '''Class to encode input characters as arrays of binary values.'''
 
-    def __init__(self, num_code_dict = {}):
-        super().__init__(num_code_dict)
-        len_binary_features = len(character_to_features('a')) - 1  # any character
+    PADDING = '\u0000'  # Unicode null character
+    START_TEXT = '\u0002'  # Unicode STX character
+    END_TEXT = '\u0003'  # Unicode ETX character
+    MASKING = '\u0005'   # Unicode ENQ character
+
+    def __init__(self, num_code_dict={},
+                 add_start_char=False, add_end_char=False,
+                 add_mask_char=False, file=None):
+        '''
+        Initialise encoder.
+        If the path and name of a JSON save file are specified in 'file',
+        the encoder is initialised from data found in that file.
+        Add character codes for special control characters that will be
+        used during model training and prediction, especially padding,
+        and optionally characters that indicate start and end of a text
+        (at the right and left edge of a padding sequence respectively,
+        to be used if the padding characters are masked away using
+        Keras masking and thus ignored as timesteps) and a special
+        masking character (which is crucially NOT ignored as a timestep,
+        but rather serves as an "unknown", to be predicted character).
+        '''
+        if file is not None:
+            self.load(file)
+            return
+        extended_codes = num_code_dict.copy()
+        if add_start_char:
+            extended_codes[self.START_TEXT] = len(extended_codes) + 1
+        if add_end_char:
+            extended_codes[self.END_TEXT] = len(extended_codes) + 1
+        if add_mask_char:
+            extended_codes[self.MASKING] = len(extended_codes) + 1
+        super().__init__(extended_codes)
+        len_binary_features = len(character_to_features('a')) - 1  # any char
         self.code_dimension = self.one_hot_dimension + len_binary_features
-        self.ch_encodings[self.PADDING_CHAR] = np.zeros(self.code_dimension)
+
+        # The padding character is encoded as a numpy zeros
+        # array of the code dimension.
+        self.ch_encodings[self.PADDING] = np.zeros(self.code_dimension)
 
     def encode(self, character):
-        if character not in self.ch_encodings:
+        try:
+            return self.ch_encodings[character]
+        except KeyError:
             char_features = character_to_features(character)
             norm_character = char_features[0]
 
@@ -226,21 +258,38 @@ class InputEncoder(CharacterEncoder):
             # Add binary features
             oh_array[-len(binary_features):] = binary_features
             self.ch_encodings[character] = oh_array
+            return oh_array
 
-        return self.ch_encodings[character]
+    def load(self, fname):
+        super().load(fname)
+        for key in self.ch_encodings_keys:
+            self.encode(key)
 
 
 class OutputEncoder(CharacterEncoder):
-    '''Class to encode output characters as arrays of binary values.'''
+    '''Class to encode output characters as one-hot vectors.'''
 
-    def __init__(self, num_code_dict = {}):
+    def __init__(self, num_code_dict={}, file=None):
+        '''
+        Initialise encoder.
+        If the path and name of a JSON save file are specified in 'file',
+        the encoder is initialised from data found in that file.
+        '''
+        if file is not None:
+            self.load(file)
+            return
         super().__init__(num_code_dict)
         self.diag_matrix = np.diag(np.ones(self.one_hot_dimension))
 
     def encode(self, character):
+        '''Return one-hot vector representation for the character'''
         # Rare output characters are identified as a generic OOV
         # character with code 0.
         return self.diag_matrix[self.num_code_dict.get(character, 0)]
+
+    def to_int(self, character):
+        '''Return the integer code for the character, 0 for OOV'''
+        return self.num_code_dict.get(character, 0)
 
     def load(self, fname):
         super().load(fname)
@@ -272,7 +321,6 @@ def normal_lower(ch):
     except:
         pass
 
-    diacritic = None
     norm_ch = unicodedata.normalize('NFD', low)
     return norm_ch[0]
 
@@ -305,6 +353,7 @@ def has_diacritic(ch):
 
 
 def character_to_features(ch):
+    '''Transform a character into a tuple of features'''
     return (
             normal_lower(ch),         # normalised character
             ch.isalpha(),             # is a letter

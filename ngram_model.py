@@ -13,16 +13,18 @@ import os
 import sys
 import math
 import random
+import pickle
 from io import StringIO
 from more_itertools import windowed, split_into, chunked
 from encode_characters import OutputEncoder
 
 MAX_SEGMENT_LENGTH = 4
 NUMBER_OF_SEGMENTS = 10000
-CORPUS_DIR = 'lstm_input'
+CORPUS_DIR = '/home/pgergo/ds_lexknowrep/lexknowrep/lstm_input/'
 
-FORWARD_OUTPUT_FILE = 'ngram-forward.model'
-BACKWARD_OUTPUT_FILE = 'ngram-backward.model'
+if not CORPUS_DIR.endswith('/'):
+    CORPUS_DIR += '/'
+
 
 def main():
     '''
@@ -30,13 +32,18 @@ def main():
     corpus consisting of plain text files.
     '''
 
-    output_enc = OutputEncoder()
-    output_enc.load('output_encoder.pickle')
+    n = sys.argv[1]
 
-    trie_forward = MultiNgramTrieRoot(output_enc, 5)
-    trie_backward = MultiNgramTrieRoot(output_enc, 5)
+    FORWARD_OUTPUT_FILE = f'{n}-gram-forward.model'
+    BACKWARD_OUTPUT_FILE = f'{n}-gram-backward.model'
 
-    corpus_files = os.listdir(CORPUS_DIR)
+    output_enc = OutputEncoder(file='output_encoder.json')
+
+    trie_forward = MultiNgramTrieRoot(output_enc, int(n))
+    trie_backward = MultiNgramTrieRoot(output_enc, int(n))
+
+    corpus_files = [fname for fname in os.listdir(CORPUS_DIR)
+                    if fname.endswith('.txt')]
 
     # The corpus file is split into input strings ("segments") so that
     # all input strings end at the end of a line in the document,
@@ -46,22 +53,25 @@ def main():
     # newlines occur in texts.
 
     segment_lengths = random.choices(range(1, MAX_SEGMENT_LENGTH + 1),
-                                weights=range(1, MAX_SEGMENT_LENGTH + 1),
-                                k=NUMBER_OF_SEGMENTS)
+                                     weights=range(1, MAX_SEGMENT_LENGTH + 1),
+                                     k=NUMBER_OF_SEGMENTS)
     big_slice_length = sum(segment_lengths)
 
     for f_name in corpus_files:
         with open(CORPUS_DIR + f_name, encoding="utf-8") as infile:
             print("Working on", f_name)
             big_slices = chunked(infile, big_slice_length)
-            segments = map(lambda x : split_into(x, segment_lengths),
-                           big_slices)
-            for seg in segments:
-                # Strip final newline(s) from the very end
-                # of each input string.
-                joined_segments = list(filter(lambda x : len(x) > 0,
-                                map(lambda x : ''.join(x).rstrip('\n'), seg)))
-                                                  
+            for big_slice in big_slices:
+                segments = split_into(big_slice, segment_lengths)
+                # Each segment is an array of lines. Join these lines,
+                # the strip newlines from both ends of these joined
+                # strings. Newlines within a segment are
+                # kept.
+                joined_segments =\
+                    (''.join(seg).strip('\n') for seg in segments
+                     # discard any empty splits at the end of a "big slice":
+                     if len(seg))
+
                 for js in joined_segments:
                     replaced_string = trie_forward.replace_oov(js)
                     trie_forward.add_input(replaced_string)
@@ -145,7 +155,7 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         '''
         self.bigram_freqs = {}
         self.unigram_freqs = {key: self.children[key].total / self.total
-                                            for key in self.children.keys()}
+                              for key in self.children.keys()}
         for condition in self.children.keys():
             condition_counts = {}
             for key in self.children.keys():
@@ -158,7 +168,7 @@ class MultiNgramTrieRoot(MultiNgramTrie):
             for key in condition_counts.keys():
                 self.bigram_freqs.update({condition + key:
                                          condition_counts[key] / count_sum})
-    
+
     def cond_prob(self, ngram, verbose=False):
         '''
         Return maximum likelihood estimate of the conditional probability
@@ -170,8 +180,8 @@ class MultiNgramTrieRoot(MultiNgramTrie):
             if verbose:
                 print(ngram, "not seen in corpus")
             return 0.0
-        condition_count = sum(map(lambda x: x.prefix_count(ngram[:-1]),
-                                  self.children.values()))
+        condition_count = sum(v.prefix_count(ngram[:-1])
+                              for v in self.children.values())
         if verbose:
             print(ngram, "ngram count", ngram_count, ',',
                   "condition count", condition_count, ',',
@@ -195,13 +205,12 @@ class MultiNgramTrieRoot(MultiNgramTrie):
 
         if len(ngram) == 1:
             return self.unigram_freqs
-        
+
         if len(ngram) == 2:
             return {key: self.bigram_freqs[ngram[0] + key]
-                                    for key in self.children.keys()}
-        
+                    for key in self.children.keys()}
+
         condition = ngram[:-1]
-        target = ngram[-1]
         alt_target_counts = {}
 
         for alt_target in self.children.keys():
@@ -216,9 +225,9 @@ class MultiNgramTrieRoot(MultiNgramTrie):
 
         # normalisation
         counts_sum = sum(alt_target_counts.values())
-        alt_target_counts = {k: v / counts_sum for k, v 
-                                           in alt_target_counts.items()}
-        
+        alt_target_counts = {k: v / counts_sum
+                             for k, v in alt_target_counts.items()}
+
         return alt_target_counts
 
     def estimate_prob(self, ngram, verbose=False):
@@ -252,7 +261,7 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         of length n-1 but all other possible final elements all
         had a count of 0 in the corpus (i.e. the n-1-gram prefix did
         not occur in the corpus at all), probability estimation
-        backs off to an n-1-gram model. 
+        backs off to an n-1-gram model.
         '''
         if len(ngram) > self.n or self.prefix_count(ngram[:-1]) == 0:
             return self.backoff_alternatives(ngram[1:])
@@ -269,20 +278,20 @@ class MultiNgramTrieRoot(MultiNgramTrie):
         based on the stored bigram frequencies) if the specified n-gram
         did not appear in the training corpus.
         '''
-        
+
         # return unigram frequencies
         if len(ngram) == 0:
             unigrams_desc = sorted(self.children.keys(),
-                                  key=lambda x : self.children[x].total,
-                                  reverse=True)
+                                   key=lambda x: self.children[x].total,
+                                   reverse=True)
             return unigrams_desc[:m]
 
         # Add a dummy space character at the end so that
         # its alternatives will be considered.
         alternatives = self.backoff_alternatives(ngram + ' ')
         best_next = sorted(alternatives.keys(),
-                    key=lambda x : alternatives[x],
-                    reverse=True)[:m]
+                           key=lambda x: alternatives[x],
+                           reverse=True)[:m]
         return best_next
 
     def replace_oov(self, string):
@@ -319,13 +328,12 @@ class MultiNgramTrieRoot(MultiNgramTrie):
             # the initial padding character.
             for i in range(1, self.n - 1):
                 ngram = string[:i + 1]
-                condition = ngram[:-1]
                 target = ngram[-1]
 
                 alternatives = self.backoff_alternatives(ngram)
                 best_next = sorted(alternatives.keys(),
-                    key=lambda x : alternatives[x],
-                    reverse=True)[0]
+                                   key=lambda x: alternatives[x],
+                                   reverse=True)[0]
 
                 if best_next == target:
                     correct_guesses += 1
@@ -339,25 +347,24 @@ class MultiNgramTrieRoot(MultiNgramTrie):
 
         for ngram in windows:
             ngram = ''.join(ngram)
-            condition = ngram[:-1]
             target = ngram[-1]
 
             alternatives = self.backoff_alternatives(ngram)
             best_next = sorted(alternatives.keys(),
-                key=lambda x : alternatives[x],
-                reverse=True)[0]
+                               key=lambda x: alternatives[x],
+                               reverse=True)[0]
 
             if best_next == target:
                 correct_guesses += 1
             sum_of_logs -= math.log2(alternatives[target])
-        
+
         return (correct_guesses / num_predictions,      # accuracy
                 2 ** (sum_of_logs / num_predictions))   # perplexity
 
     def string_perplexity(self, string):
         '''Calculate perplexity score on an input string.'''
         string = self.replace_oov(string)
-       
+
         num_predictions = len(string) - (self.n - 1)
         sum_of_logs = 0
         windows = windowed(string, self.n)
@@ -382,32 +389,30 @@ class BiMultiNgramModel:
         of the final element of the forward n-gram and those of the
         backward n-gram.
         Any combining function with a single list argument can be
-        passed, but there are two obvious choices: max and sum.
-        As the predictions are normalised, the sum function will
-        yield the mean of the two models' predictions.
-        The prediction accuracy and preplexity metrics for summing are
-        generally better than for taking the max, so the sum function
-        is applied by default.
+        passed, obvious choices are max, sum and math.prod.
+        The prediction accuracy and perplexity metrics for multiplication
+        are generally better than for summing or taking the max,
+        so the math.prod function is applied by default.
         '''
         if combine_function is None:
-            combine_function = sum
+            combine_function = math.prod
 
         forward_alt =\
-                self.forward_model.backoff_alternatives(forward_ngram)
+            self.forward_model.backoff_alternatives(forward_ngram)
         backward_alt =\
-                self.backward_model.backoff_alternatives(backward_ngram)
+            self.backward_model.backoff_alternatives(backward_ngram)
 
         combined_alternatives = {}
 
         for key in forward_alt.keys():
             combined_alternatives[key] =\
-                             combine_function([forward_alt[key],
-                                               backward_alt[key]])
+                combine_function([forward_alt[key],
+                                  backward_alt[key]])
 
         # normalisation
         total_probs = sum(combined_alternatives.values())
-        combined_alternatives = {k: v / total_probs for k, v 
-                                        in combined_alternatives.items()}
+        combined_alternatives = {k: v / total_probs
+                                 for k, v in combined_alternatives.items()}
 
         return combined_alternatives
 
@@ -429,8 +434,8 @@ class BiMultiNgramModel:
         lower-order backoff model is used.
 
         Any combination function with a single list argument
-        can be passed, but there are two obvious choices:
-        max and sum.
+        can be passed, obvious choices are max, sum and math.prod.
+        Of these, math.prod tends to yield best results.
         '''
 
         # Add an extra space as a dummy target for which
@@ -439,8 +444,9 @@ class BiMultiNgramModel:
                                                           backward_ngram + " ",
                                                           combine_function)
 
-        best_next=sorted(combined_alternatives.keys(),
-                key=lambda x : combined_alternatives[x], reverse=True)[:m]
+        best_next = sorted(combined_alternatives.keys(),
+                           key=lambda x: combined_alternatives[x],
+                           reverse=True)[:m]
 
         return best_next
 
@@ -500,8 +506,9 @@ class BiMultiNgramModel:
         combined_alternatives = self.combine_alternatives(forward_ngram,
                                                           backward_ngram,
                                                           combine_function)
-        best_next=sorted(combined_alternatives.keys(),
-                         key=lambda x : combined_alternatives[x], reverse=True)[0]
+        best_next = sorted(combined_alternatives.keys(),
+                           key=lambda x: combined_alternatives[x],
+                           reverse=True)[0]
 
         return (best_next, combined_alternatives[target])
 
@@ -537,9 +544,8 @@ class BiMultiNgramModel:
             for target_index in range(1, self.forward_model.n - 1):
                 substring = string[:target_index + self.backward_model.n]
                 next_pred, prob_estimate =\
-                                    self.pred_estimate(substring,
-                                                       target_index,
-                                                       combine_function)
+                    self.pred_estimate(substring, target_index,
+                                       combine_function)
                 if next_pred == string[target_index]:
                     correct_guesses += 1
                 if print_string:
@@ -552,9 +558,8 @@ class BiMultiNgramModel:
             for target_index in range(1, self.backward_model.n - 1):
                 substring = end_backward[:target_index + self.forward_model.n]
                 next_pred, prob_estimate =\
-                                    self.pred_estimate(substring,
-                                                       target_index,
-                                                       combine_function)
+                    self.pred_estimate(substring, target_index,
+                                       combine_function)
                 if next_pred == substring[target_index]:
                     correct_guesses += 1
                 print_string_suffix += next_pred
@@ -571,8 +576,8 @@ class BiMultiNgramModel:
 
         for window in windows:
             window = ''.join(window)
-            next_pred, prob_estimate = self.pred_estimate(window,
-                                            combine_function=combine_function)
+            next_pred, prob_estimate =\
+                self.pred_estimate(window, combine_function=combine_function)
 
             if next_pred == window[target_index]:
                 correct_guesses += 1
@@ -594,7 +599,7 @@ class BiMultiNgramModel:
             raise ValueError('Input string "' + string + '" is too short.')
 
         string = self.forward_model.replace_oov(string)
-       
+
         num_predictions = (len(string) -
                            (self.forward_model.n + self.backward_model.n) + 2)
         sum_of_logs = 0
@@ -607,12 +612,14 @@ class BiMultiNgramModel:
 
         return (2 ** (sum_of_logs / num_predictions))
 
+
 class MultiNgramModelNonrec:
     '''
     Non-recursive version of a multi-ngram model.
     Should run about 5 times faster if properly optimised.
     '''
     PADDING = '\u0000'
+
     def __init__(self, n=3):
         '''Constructor. n is the order of the language model.'''
         self.ngrams = {'': 0}
@@ -644,7 +651,7 @@ class MultiNgramModelNonrec:
         until a whole n-gram fits.
         '''
         string = self.PADDING + string + self.PADDING
-        
+
         # Process prefixes of up to n-1 characters
         for i in range(self.n - 1, 1, -1):
             self.add(string[0:i])
@@ -652,6 +659,7 @@ class MultiNgramModelNonrec:
         for i in range(len(string)):
             substring = string[max(0, i - (self.n - 1)):i + 1]
             self.add(substring)
+
 
 if __name__ == '__main__':
     main()

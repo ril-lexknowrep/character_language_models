@@ -33,3 +33,12 @@ confusion_matrix:
 use_lm:
 	clear ; time python3 use_lm.py | grep -v "1/1" > use_lm.log
 
+dehyph-perpl:
+	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py > dehyph_perpl.log
+
+# -----
+
+# obsolete
+dehyph:
+	clear ; time python3 dehyph.py | grep -v "[0-9]/[0-9].*ETA:" > dehyph.log
+

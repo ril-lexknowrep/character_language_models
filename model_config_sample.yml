@@ -43,6 +43,12 @@ models:
 
   log_file: model.log
 
+# Training and validation batch size for this model. If not set,
+# the default values for training and validation batch size as
+# set in lstm_model.py will be used.
+#  train_batch: 256
+#  val_batch: 8192
+
 # Path to input and output encoder files to be used by the model
   input_encoder: input_encoder.json
   output_encoder: output_encoder.json

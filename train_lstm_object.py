@@ -214,6 +214,7 @@ def main():
 
                 summary_dict = {
                     'model_name': model_name,
+                    'parameters': bilstm_model.model.count_params(),
                     'total_time': total_time,
                     'chars_per_sec': chars_per_sec,
                     'words_per_sec': words_per_sec,
@@ -278,9 +279,19 @@ def main():
 
                 epoch_texts.extend(input_texts)
 
+            batch_size = lstm_model.DEFAULT_BATCH_SIZE
+            if m_data.train_batch:
+                batch_size = m_data.train_batch
+
+            val_batch_size = lstm_model.VALIDATION_BATCH_SIZE
+            if m_data.val_batch:
+                val_batch_size = m_data.val_batch
+
             train_start = time()
             metrics = bilstm_model.train(epoch_texts,
-                                         validation_texts=validation_texts)
+                                         validation_texts=validation_texts,
+                                         batch_size=batch_size,
+                                         validation_batch_size=val_batch_size)
             train_end = time()
             train_secs = int(train_end - train_start)
 
@@ -451,7 +462,9 @@ def read_training_config(file_path):
                                cfg_dict.get('name', None),
                                cfg_dict.get('log_file', None),
                                cfg_dict.get('embedding', 0),
-                               cfg_dict.get('final_only', False))
+                               cfg_dict.get('final_only', False),
+                               cfg_dict.get('train_batch', None),
+                               cfg_dict.get('val_batch', None))
         except KeyError as k_err:
             print(f"\nRequired key missing in YAML config: {k_err}\n")
             raise

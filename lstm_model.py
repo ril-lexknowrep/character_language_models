@@ -7,13 +7,15 @@ import json
 from contextlib import redirect_stdout
 from io import StringIO
 from itertools import accumulate
+import pathlib
 
 import tensorflow as tf
+import keras
 from tensorflow.keras.layers import Concatenate, LSTM, Dense, Dropout,\
     Embedding, Masking
 from more_itertools import windowed
 
-MODULE_VERSION = "0.1.0"
+MODULE_VERSION = "0.1.1"
 
 DEFAULT_BATCH_SIZE = 256
 CLIPNORM_THRESHOLD = 1.0
@@ -54,6 +56,42 @@ def files_to_texts(file_names):
     return texts
 
 
+def get_full_name(model_name):
+    '''Return full name of a named model based on the base name'''
+    return f'BiLSTM_Model_v{MODULE_VERSION}>{model_name}>'
+
+
+def rename_model(model_file, new_name,
+                 file_name=None, force=False, rename_file=True):
+    '''
+    Rename model in saved model file to new name.
+    By default the file is renamed along with it to the new name
+    plus the original file extension.
+    Alternatively a different full file name can be specified under
+    which the renamed model is saved.
+    '''
+    KERAS_NAME_PATTERN = r'^[A-Za-z0-9.][A-Za-z0-9_.\\/>-]*$'
+    if not force:
+        if re.match(KERAS_NAME_PATTERN, new_name) is None:
+            raise ValueError("Invalid new name. Name must match "
+                             + f"{KERAS_NAME_PATTERN}")
+        if not new_name.startswith(f"BiLSTM_Model_v{MODULE_VERSION}"):
+            raise ValueError("Invalid new name. Name should start with "
+                             + MODULE_VERSION)
+    model = tf.keras.models.load_model(
+        model_file,
+        custom_objects={"PerElementPerplexity": PerElementPerplexity})
+    model._name = new_name
+
+    if file_name is not None:
+        model.save(file_name)
+    else:
+        model.save(model_file)
+        if rename_file:
+            model_file = pathlib.Path(model_file)
+            model_file.rename(new_name + model_file.suffix)
+
+
 class BiLSTM_Model:
     '''
     Class for bidirectional LSTM language models.
@@ -84,7 +122,8 @@ class BiLSTM_Model:
                  dropout_ratios=[0], pass_final_output_only=False,
                  verbose=True, log_file=None, model_name=None):
 
-        self.str = (f'w_{left_context}-{right_context}_'
+        self.str = ((f'name="{model_name}"_' if model_name else '')
+                    + f'w_{left_context}-{right_context}_'
                     + (f'embedding_{embedding}_' if embedding else '')
                     + f'lstm_{"-".join(str(x) for x in lstm_units)}_'
                     + f'dense_{"-".join(str(x) for x in dense_neurons)}_'
@@ -102,11 +141,22 @@ class BiLSTM_Model:
                  in enumerate(input_encoder.keys())}
             input_encoder.code_dimension = 1
 
+        # Naming philosophy:
+        # The idea is that the user will choose a unique name for the model,
+        # so adding an extra timestamp is not necessary. In fact it would
+        # make things unnecessarily difficult if the user wants to continue
+        # training a named model on the same or on a different corpus.
+        # On the other hand, the timestamp is necessary to tell apart two
+        # or more identical anonymous models that were e.g. trained on
+        # different corpora, since without the timestamp these would be
+        # saved to a model file with the same name (i.e. one would
+        # overwrite the other).
         if model_name is None:
-            self.name = repr(self) + '@' + timestamp()
+            self.name = repr(self) + '>' + timestamp()
         else:
-            self.name = model_name
+            self.name = get_full_name(model_name)
 
+        self.log_file = log_file
         self.logger = logging.getLogger(name=self.name)
 
         logging.basicConfig(filename=log_file,
@@ -291,7 +341,7 @@ class BiLSTM_Model:
         return self.str
 
     def __repr__(self):
-        return f'BiLSTM_Model_v{MODULE_VERSION}({str(self)})'
+        return f'BiLSTM_Model_v{MODULE_VERSION}>{str(self)}>'
 
     def learning_rate_decay():
         # Decay learning rate gradually from 1e-3 to 1e-5 until a total of
@@ -316,7 +366,10 @@ class BiLSTM_Model:
 
     @classmethod
     def load(cls, model_file, input_encoder, output_encoder,
-             check_version=True):
+             check_version=True, embedding=False):
+        '''
+        Load Keras model from file and restore its state before it was saved.
+        '''
         saved_model =\
             tf.keras.models.load_model(model_file,
                                        custom_objects={"PerElementPerplexity":
@@ -324,13 +377,20 @@ class BiLSTM_Model:
 
         left_context = saved_model.inputs[0].shape[1]
         right_context = saved_model.inputs[1].shape[1]
-        input_dim = saved_model.inputs[0].shape[2]
-        output_dim = saved_model.outputs[0].shape[1]
 
-        assert input_encoder.code_dimension == input_dim
-        assert output_encoder.code_dimension == output_dim
+        if any(isinstance(layer, keras.layers.core.embedding.Embedding)
+               for layer in saved_model.layers):
+            input_encoder.input_char_to_int =\
+                {input_encoder.PADDING: 0,
+                 input_encoder.START_TEXT: 1,
+                 input_encoder.END_TEXT: 2,
+                 input_encoder.MASKING: 3}
+            input_encoder.input_char_to_int |=\
+                {key: i + 4 for i, key
+                 in enumerate(input_encoder.keys())}
+            input_encoder.code_dimension = 1
 
-        version_match = re.match(r"BiLSTM_Model_v(.*)\(", saved_model.name)
+        version_match = re.match(r"BiLSTM_Model_v([0-9.]+)", saved_model.name)
 
         return_model = BiLSTM_Model(input_encoder,
                                     output_encoder,
@@ -357,34 +417,39 @@ class BiLSTM_Model:
                         + " or load the model with check_version=False.")
                 except RuntimeError as error:
                     return_model.logger.exception(str(error))
+                    raise
             else:
                 return_model.logger.warning(
                     error_message
                     + "Loading anyway because check_version=False.")
 
-#        saved_optimizer = saved_model.optimizer
+        # This part is necessary, because on loading the model "run_eagerly"
+        # is automatically deactivated. It seems that the model must be
+        # recompiled every time on loading to run TF eagerly, which is in
+        # turn required for calculation of the perplexity metric.
 
-#        saved_model.compile(loss='categorical_crossentropy',
-#                            optimizer='adam',
-#                            metrics=['accuracy', PerElementPerplexity()],
-#                            run_eagerly=True)
+        saved_optimizer = saved_model.optimizer
+        saved_model.compile(loss='categorical_crossentropy',
+                            optimizer='adam',
+                            metrics=['accuracy', PerElementPerplexity()],
+                            run_eagerly=True)
         # Compile creates a new optimizer, so data on training progress,
         # particularly the number of iterations so far, is lost.
-#        saved_model.optimizer = saved_optimizer
-
+        saved_model.optimizer = saved_optimizer
         return_model.model = saved_model
 
-#        return_model.model.optimizer.learning_rate =\
-#            BiLSTM_Model.learning_rate_decay()
-
-#        return_model.logger.info("Learning rate set to "
-#                                 + return_model.model.optimizer.learning_rate)
+        return_model.model.optimizer.learning_rate =\
+            BiLSTM_Model.learning_rate_decay()
 
         print("Loaded model:")
         return_model.model.summary()
 
+        summary_output = StringIO()
+        with redirect_stdout(summary_output):
+            return_model.model.summary()
+
         return_model.logger.info("Loaded model:\n"
-                                 + str(return_model.model.summary()))
+                                 + summary_output.getvalue())
         return_model.logger.info("Trained for",
                                  int(return_model.model.optimizer.iterations),
                                  "iterations")
@@ -489,7 +554,7 @@ class BiLSTM_Model:
 
         self.logger.info(
             f'Training completed. Metrics: {json.dumps(history.history)}')
-        return history
+        return history.history
 
     def evaluate(self, texts, text_files=False,
                  batch_size=VALIDATION_BATCH_SIZE):
@@ -651,6 +716,7 @@ class BiLSTM_Model:
                 start_index = string.index(substring)
             except ValueError:
                 print(f'"{substring}" is not a substring of "{string}"')
+                raise
             end_index = start_index + len(substring) - 1
             padded_string = self.encoder.pad(string, pad_before=start_index,
                                              pad_after=end_index)

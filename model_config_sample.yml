@@ -1,10 +1,40 @@
-# A configuration file always contains a list of models,
-# possibly a single-element list.
+# A configuration file contains the specification of the corpus
+# files to be used for training and validation, followed by
+# a list of models, possibly a single-element list, that will be
+# trained on this corpus.
+# The base name of the configuration file without the final file
+# extension will be used as the name of the training run, so
+# generally a new configuration file with a new name should be
+# created for a new training run.
+
+# The specification of either a directory path containing the
+# corpus files or a list of files (but not both!) is required.
+
+# corpus_files:
+# - foo.txt
+# - bar.txt
+
+corpus_dir: /var/corpus
+
+# Validation files used during training can be specified as a list.
+# If validation files are not listed, not validation is carried out
+# during training.
+
+# Specification of models starts here
+models:
+
 - model:
 
 # Optional name. If this is not specified, a name is automatically
-# generated for the model which list is characteristics and
+# generated for the model which lists is characteristics and
 # creation timestamp.
+# Either this name, or the automatically generated name is used for
+# saving the model during training and when training is completed.
+# When resuming training of a previously created model, either
+# after a crash or when continuing training on further input,
+# train_lstm_object.py looks for a saved model with this file name.
+# If such a model is not found, a new model is created, otherwise
+# training is resumed.
 
 #  name: foo_model
 

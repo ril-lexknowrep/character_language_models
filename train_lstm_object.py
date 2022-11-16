@@ -39,7 +39,8 @@ def main():
     '''
     args = parse_arguments()
 
-    (training_name, corpus_files, corpus_dir, validation_files, m_configs) =\
+    (training_name, corpus_files, corpus_dir, validation_files,
+     general_train_batch, general_val_batch, m_configs) =\
         read_training_config(args.config_file)
 
     progress_file = Path(training_name + '.progress.yml')
@@ -212,9 +213,16 @@ def main():
                 # Writing summary of traning results
                 last_iter = iterations_log[-1]
 
+                batch_size = lstm_model.DEFAULT_BATCH_SIZE
+                if m_data.train_batch:
+                    batch_size = m_data.train_batch
+                elif general_train_batch:
+                    batch_size = general_train_batch
+
                 summary_dict = {
                     'model_name': model_name,
                     'parameters': bilstm_model.model.count_params(),
+                    'batch_size': batch_size,
                     'total_time': total_time,
                     'chars_per_sec': chars_per_sec,
                     'words_per_sec': words_per_sec,
@@ -282,10 +290,14 @@ def main():
             batch_size = lstm_model.DEFAULT_BATCH_SIZE
             if m_data.train_batch:
                 batch_size = m_data.train_batch
+            elif general_train_batch:
+                batch_size = general_train_batch
 
             val_batch_size = lstm_model.VALIDATION_BATCH_SIZE
             if m_data.val_batch:
                 val_batch_size = m_data.val_batch
+            elif general_val_batch:
+                val_batch_size = general_val_batch
 
             train_start = time()
             metrics = bilstm_model.train(epoch_texts,
@@ -424,6 +436,8 @@ def read_training_config(file_path):
         log_file: str | None = None
         embedding: int = 0
         pass_final_output_only: bool = False
+        train_batch: int | None = None
+        val_batch: int | None = None
 
     configs = []
 
@@ -443,6 +457,9 @@ def read_training_config(file_path):
         raise ValueError("No corpus specified in training configuration.")
 
     validation_files = training_cfg.get('validation_files', None)
+
+    general_train_batch = training_cfg.get('train_batch', None)
+    general_val_batch = training_cfg.get('val_batch', None)
 
     for cfg_dict in training_cfg['models']:
         try:
@@ -473,7 +490,8 @@ def read_training_config(file_path):
             raise
         configs.append(data)
     return (training_run_name, corpus_files, corpus_dir,
-            validation_files, configs)
+            validation_files, general_train_batch,
+            general_val_batch, configs)
 
 
 def read_progress_file(p_file):

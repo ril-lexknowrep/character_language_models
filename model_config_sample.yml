@@ -20,6 +20,17 @@ corpus_dir: /var/corpus
 # If validation files are not listed, not validation is carried out
 # during training.
 
+# validation_files:
+# - val_baz.txt
+
+# Training and validation batch size for the training of all models.
+# This will be used unless overridden for a particular model.
+# If not set, the default values for training and validation batch size
+# as set in lstm_model.py will be used.
+#  train_batch: 256
+#  val_batch: 8192
+
+
 # Specification of models starts here
 models:
 
@@ -43,9 +54,9 @@ models:
 
   log_file: model.log
 
-# Training and validation batch size for this model. If not set,
-# the default values for training and validation batch size as
-# set in lstm_model.py will be used.
+# Training and validation batch size for this model. Overrides
+# the general setting as specified in the training configuration.
+
 #  train_batch: 256
 #  val_batch: 8192
 

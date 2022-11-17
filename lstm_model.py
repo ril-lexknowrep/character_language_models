@@ -406,8 +406,8 @@ class BiLSTM_Model:
 
         if version_match[1] != MODULE_VERSION:
             error_message =\
-                ("Saved model was created with"
-                 + version_match[0][:-1] +
+                ("Saved model was created with "
+                 + version_match[0][:-1]
                  + f" but the current version is {MODULE_VERSION}. ")
             if check_version:
                 try:

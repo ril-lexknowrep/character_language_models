@@ -2,6 +2,7 @@
 Use biLSTM for dehyphenation.
 """
 
+import argparse
 import os
 import re
 import sys
@@ -13,7 +14,7 @@ from scipy.stats import entropy
 
 import tensorflow as tf
 import lstm_model
-from encode_characters import InputEncoder, OutputEncoder
+from encode_characters import InputEncoder, OutputEncoder, character_to_features
 
 
 def disable_print():
@@ -43,6 +44,12 @@ def stdinchars():
         yield from line
 
 
+def eprint(*args, **kwargs):
+    """Print to stderr."""
+    # https://stackoverflow.com/a/14981125/8746466 
+    print(*args, file=sys.stderr, **kwargs)
+
+
 def main():
     """Main."""
 
@@ -50,12 +57,24 @@ def main():
     # XXX utána jön a kiértékelés, amikor összevetjük a golddal
     # XXX itt szóbajön a difflib.SequenceMatcher(autojunk=False)
 
+    args = get_args()
+    VERBOSE = args.verbose
+
     # --- init model
     input_enc = InputEncoder(file="input_encoder.json")
     output_enc = OutputEncoder(file="output_encoder.json")
     disable_print()
-    bilstm_model = lstm_model.BiLSTM_Model.load('bilstm_model_512_renamed.h5',
-                                                input_enc, output_enc)
+    MODEL_FILENAME = "bilstm_model_512.h5"
+    try:
+        bilstm_model = lstm_model.BiLSTM_Model.load(
+            MODEL_FILENAME, input_enc, output_enc)
+    except RuntimeError as e:
+        eprint()
+        eprint(e)
+        eprint(f"\nModelfile ({MODEL_FILENAME})'s version differs, loading with check_version=False")
+        bilstm_model = lstm_model.BiLSTM_Model.load(
+            MODEL_FILENAME, input_enc, output_enc,
+        check_version=False)
     enable_print()
 
     # --- parameters
@@ -65,8 +84,6 @@ def main():
             # XXX 5-tel hogy tudom megpróbálni??? ERROR: "Too short"
     # XXX how to define padding to be consistent with BiLSTM_Model?
     PADDING = ' ' * CS
-
-    VERBOSE = True
 
     # define target point -- the 1st is the potential error to fix!
 #    REPLACEMENTS = [' ', ''] # fragm -- fail XXX too frequent!
@@ -134,6 +151,22 @@ def main():
             next(window_iter)
 
     print()
+
+
+def get_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    # boolean argument: True if present, False if not present
+    parser.add_argument(
+        '-v', '--verbose',
+        help='verbose output',
+        action='store_true'
+    )
+    
+    return parser.parse_args()
 
 
 if __name__ == '__main__':

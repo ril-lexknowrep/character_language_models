@@ -142,9 +142,10 @@ class BiLSTM_Model:
             input_encoder.code_dimension = 1
 
         # Naming philosophy:
-        # The idea is that the user will choose a unique name for the model,
-        # so adding an extra timestamp is not necessary. In fact it would
-        # make things unnecessarily difficult if the user wants to continue
+        # The idea is that if a user has specified a name for the model, 
+        # then that name can be assumed to be unique, so adding an extra
+        # timestamp is not necessary. In fact it would make things
+        # unnecessarily difficult if the user wants to continue
         # training a named model on the same or on a different corpus.
         # On the other hand, the timestamp is necessary to tell apart two
         # or more identical anonymous models that were e.g. trained on
@@ -390,7 +391,7 @@ class BiLSTM_Model:
                  in enumerate(input_encoder.keys())}
             input_encoder.code_dimension = 1
 
-        version_match = re.match(r"BiLSTM_Model_v([0-9.]+)", saved_model.name)
+        version_match = re.match(r"BiLSTM_Model_v([0-9.]+)>", saved_model.name)
 
         return_model = BiLSTM_Model(input_encoder,
                                     output_encoder,
@@ -399,12 +400,24 @@ class BiLSTM_Model:
                                     verbose=False,
                                     model_name=saved_model.name)
 
-        parenthesis_index = saved_model.name.find("(")
-        return_model.str = saved_model.name[parenthesis_index + 1:-1]
-
         return_model.logger.info(f"Loading model from file {model_file}.")
 
-        if version_match[1] != MODULE_VERSION:
+        if version_match is None:
+            error_message =\
+                ("Unable to establish module version with which the saved "
+                 + "model was created based one saved model name "
+                 + f"{saved_model.name}. Consider renaming the model using "
+                 + "rename_model() or set check_version() to False.")
+            if check_version:
+                return_model.logger.exception(error_message)
+                raise RuntimeError(error_message)
+            else:
+                return_model.name = saved_model.name
+                return_model.str = saved_model.name
+                return_model.logger.warning(
+                    error_message
+                    + "Loading anyway because check_version=False.")
+        elif version_match[1] != MODULE_VERSION:
             error_message =\
                 ("Saved model was created with "
                  + version_match[0]
@@ -422,6 +435,11 @@ class BiLSTM_Model:
                 return_model.logger.warning(
                     error_message
                     + "Loading anyway because check_version=False.")
+
+        if version_match:
+            whole_match = version_match[0]
+            return_model.name = saved_model.name
+            return_model.str = saved_model.name[len(whole_match):]
 
         # This part is necessary, because on loading the model "run_eagerly"
         # is automatically deactivated. It seems that the model must be
@@ -732,7 +750,7 @@ class BiLSTM_Model:
         If "token_dicts" is False, a numpy matrix containing the
         predicted probabilities and perplexities is returned in "p" and
         "perpl" respectively instead of lists of dicts.
-        Sequences are padded to the left or right as required if the 
+        Sequences are padded to the left or right as required if the
         sequence's prefix or suffix preceding and following the
         start and end index respectively are shorter than the context
         windows required by the model.

@@ -59,6 +59,7 @@ def main():
 
     args = get_args()
     VERBOSE = args.verbose
+    EVAL = args.eval
 
     # --- init model
     input_enc = InputEncoder(file="input_encoder.json")
@@ -86,6 +87,7 @@ def main():
     PADDING = ' ' * CS
 
     # define target point -- the 1st is the potential error to fix!
+    # XXX should be updated to dict format (see below)
 #    REPLACEMENTS = [' ', ''] # fragm -- fail XXX too frequent!
 #    REPLACEMENTS = ['e', 'é'] # diacr -- fail XXX too frequent!
 #    REPLACEMENTS = ['ö', 'ő'] # diacr -- success
@@ -96,12 +98,22 @@ def main():
 #    TARGET = re.compile(REPLACEMENTS[0])
 #    TARGET_LENGTH = len(REPLACEMENTS[0])
 
+    # XXX labels from dehyphenation repo / scripts/consts.py
+    BREAKING_HYPHEN_LABEL = "1"
+    DIGRAPH_HYPHEN_LABEL = "2"
+    ORTHOGRAPHIC_HYPHEN_LABEL = "3"
+    HYPHEN_PLUS_SPACE_LABEL = "4"
+
     # dehyphenation -- regexes needed because of digraphs
-    REPLACEMENTS = [r'\1- ', r'\1-', r'\1', '']
+    REPLACEMENTS = {
+        r'\1- ': HYPHEN_PLUS_SPACE_LABEL,
+        r'\1-': ORTHOGRAPHIC_HYPHEN_LABEL,
+        r'\1': BREAKING_HYPHEN_LABEL,
+        '': DIGRAPH_HYPHEN_LABEL
+    }
     # asz- szony / asz-szony / aszszony / asszony
-    TARGET = re.compile(r'(.)- ')
+    TARGET = re.compile(r'(.)-\n') # handle hyphens at end of line
     TARGET_LENGTH = 3 # real length in chars!
-        # XXX how to handle '-\n' as well???
 
     # --- stdin as char stream
     chars_iter = stdinchars()
@@ -123,28 +135,37 @@ def main():
             continue
 
         variations = []
-        for repl in REPLACEMENTS:
+        for repl, label in REPLACEMENTS.items():
             # replace only in target position
             replaced = TARGET.sub(repl, targettext)
             vari = text[:CS] + replaced + text[CS+TARGET_LENGTH:]
             perpl = perplexity(bilstm_model, vari)
-            variations.append([replaced, vari, perpl])
+            variations.append([targettext, replaced, vari, perpl, label])
 
-        FOUND_INDEX, VARI_INDEX, PERPL_INDEX = 0, 1, 2
+        TARGET_INDEX, FOUND_INDEX, VARI_INDEX, PERPL_INDEX, LABEL_INDEX = 0, 1, 2, 3, 4
 
         if VERBOSE:
             print(']')
-            for _, vari, perpl in variations:
+            for _, _, vari, perpl, _ in variations:
                 print()
                 print(f' vari="{vari}"')
                 print(f' mos_perpl={perpl}')
             print()
             print('[', end='')
 
-        best = min(variations, key=lambda x: x[PERPL_INDEX])[FOUND_INDEX]
+        best = min(variations, key=lambda x: x[PERPL_INDEX])
         # XXX valszeg nem kéne változtatni, ha nagyon kicsi
         #     perpl-k eltérése, mondjuk <10% vagy ilyesmi...
-        print(best, end='')
+
+        if not EVAL:
+            print(best[FOUND_INDEX], end='')
+        else: # EVAL
+            # XXX gigahekk, kézzel szedem le az újsort,
+            #     amit a TARGET ptn megtalált,
+            #     ezzel teljesen elrontva a TARGET általánosságát.
+            #     persze itt az adott esetben éppen jó! :)
+            target_without_newline = best[TARGET_INDEX].rstrip('\n')
+            print(f'{target_without_newline}\t{{{best[LABEL_INDEX]}}}')
 
         # skip chars processed as part of TARGET
         for i in range(TARGET_LENGTH - 1):
@@ -159,12 +180,17 @@ def get_args():
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    # boolean argument: True if present, False if not present
     parser.add_argument(
         '-v', '--verbose',
         help='verbose output',
         action='store_true'
     )
+    parser.add_argument(
+        '-e', '--eval',
+        help='output labels for evaluation',
+        action='store_true'
+    )
+ 
     
     return parser.parse_args()
 

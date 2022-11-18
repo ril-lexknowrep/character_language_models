@@ -33,12 +33,14 @@ confusion_matrix:
 use_lm:
 	clear ; time python3 use_lm.py | grep -v "1/1" > use_lm.log
 
-dehyph-perpl: dehyph-perpl-verbose dehyph-perpl-noverbose
+dehyph-perpl: dehyph-perpl-plain dehyph-perpl-verbose dehyph-perpl-eval
 
+dehyph-perpl-plain:
+	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py > dehyph_test_output.txt
 dehyph-perpl-verbose:
 	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py -v > dehyph_perpl.log
-dehyph-perpl-noverbose:
-	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py > dehyph_test_output.txt
+dehyph-perpl-eval:
+	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py -e > dehyph_perpl.eval
 
 # -----
 

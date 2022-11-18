@@ -6,7 +6,7 @@ import re
 import json
 from contextlib import redirect_stdout
 from io import StringIO
-from itertools import accumulate
+from itertools import accumulate, chain
 import pathlib
 
 import tensorflow as tf
@@ -15,7 +15,7 @@ from tensorflow.keras.layers import Concatenate, LSTM, Dense, Dropout,\
     Embedding, Masking
 from more_itertools import windowed
 
-MODULE_VERSION = "0.1.1"
+MODULE_VERSION = "0.2.0"
 
 DEFAULT_BATCH_SIZE = 256
 CLIPNORM_THRESHOLD = 1.0
@@ -406,8 +406,8 @@ class BiLSTM_Model:
 
         if version_match[1] != MODULE_VERSION:
             error_message =\
-                ("Saved model was created with"
-                 + version_match[0][:-1] +
+                ("Saved model was created with "
+                 + version_match[0]
                  + f" but the current version is {MODULE_VERSION}. ")
             if check_version:
                 try:
@@ -453,6 +453,8 @@ class BiLSTM_Model:
         return_model.logger.info("Trained for",
                                  int(return_model.model.optimizer.iterations),
                                  "iterations")
+        print("Trained for", int(return_model.model.optimizer.iterations),
+              "iterations")
 
         return return_model
 
@@ -513,6 +515,8 @@ class BiLSTM_Model:
 
         validation_sequence = None
         if validation_texts:
+            if isinstance(validation_texts, str):
+                validation_texts = [validation_texts]
             if text_files:
                 validation_texts = files_to_texts(validation_texts)
 
@@ -607,11 +611,10 @@ class BiLSTM_Model:
         if target_index is not None:
             target_index = [target_index]
         return self.predict_targets([sequence], target_index,
-                                    return_metric)[0]
+                                    return_metric=return_metric)[0]
 
     def predict_targets(self, sequences, target_indices=None,
-                        batch_size=DEFAULT_BATCH_SIZE,
-                        return_metric='p'):
+                        return_metric='p', batch_size=DEFAULT_BATCH_SIZE):
         '''
         Get model's predictions for all possible output tokens at
         the target index position in each sequence as a Numpy array.
@@ -636,52 +639,40 @@ class BiLSTM_Model:
         '''
         assert return_metric in ('p', 'perpl', 'perplexity', 'entropy', 's')
 
+        if return_metric == 'perplexity':
+            return_metric = 'perpl'
+        elif return_metric == 'entropy':
+            return_metric = 's'
+
         # If a single string is provided as sequence, treat it as a
         # one-element list.
         if isinstance(sequences, str):
             sequences = [sequences]
 
         if target_indices is None:
+            # Target index points to the first character after a full
+            # left context for each sequence.
             target_indices = [self.encoder.left_context] * len(sequences)
+        elif isinstance(target_indices, int):
+            target_indices = [target_indices]
 
-        padded_seqs = []
+        preds = self.predict_subsequences(sequences,
+                                          start_indices=target_indices,
+                                          end_indices=target_indices,
+                                          token_dicts=False,
+                                          batch_size=DEFAULT_BATCH_SIZE)
 
-        for sequence, target_index in zip(sequences, target_indices):
-            padded_seqs.append(self.encoder.pad(sequence,
-                                                pad_before=target_index,
-                                                pad_after=target_index))
+        return np.array([pred[return_metric][0] for pred in preds])
 
-        if len(padded_seqs) >= MIN_PREDICT_BATCH:
-            sequence_object = BiLSTM_Sequence(
-                padded_seqs,
-                batch_size=min(len(padded_seqs), batch_size),
-                encoder=self.encoder, padded=False)
-            preds = self.model.predict(x=sequence_object)
-        else:
-            preds = []
-            for s in padded_seqs:
-                left_X, right_X, _ = self.encoder.encode(s, padded=False)
-                preds.append(self.model([left_X, right_X],
-                             training=False).numpy())
-            preds = np.array(preds)
-
-        preds[preds < PerElementPerplexity.PROB_FLOOR] =\
-            PerElementPerplexity.PROB_FLOOR
-
-        if return_metric in ("perplexity", "perpl"):
-            preds = 1 / preds
-        elif return_metric in ("entropy", "s"):
-            preds = -np.sum(preds * np.log2(preds), axis=1)
-
-        return preds
-
-    def predict_substrings(self, strings, substrings,
+    def predict_substrings(self, strings, substrings=None,
                            batch_size=DEFAULT_BATCH_SIZE):
         '''
         Return probability distributions, perplexities and entropies for
         every character position in a specified substring of each string,
         as well as the average perplexity and accuracy scores for each
         substring.
+        If no substrings are specified, every character position of each
+        string is evaluated.
         The return value is a list of dicts, each dict containing the
         above-mentioned information for a string-substring pair:
         {"p": a list of len(substring) dicts, with the possible characters
@@ -703,102 +694,162 @@ class BiLSTM_Model:
         tokens of which are characters and the sequences of which are
         strings.
         '''
-        contexts = []
-        # If a single string or substring is provided, treat them as
-        # one-element lists.
+        if substrings is None:
+            return self.predict_subsequences(strings, batch_size=batch_size)
         if isinstance(strings, str):
             strings = [strings]
         if isinstance(substrings, str):
             substrings = [substrings]
 
-        for string, substring in zip(strings, substrings):
-            try:
-                start_index = string.index(substring)
-            except ValueError:
-                print(f'"{substring}" is not a substring of "{string}"')
-                raise
-            end_index = start_index + len(substring) - 1
-            padded_string = self.encoder.pad(string, pad_before=start_index,
-                                             pad_after=end_index)
+        start_indices = []
+        end_indices = []
+        for ss, s in zip(substrings, strings, strict=True):
+            start = s.index(ss)
+            start_indices.append(start)
+            end_indices.append(start + len(ss) - 1)
 
-            # find substring in padded string again, since its index
-            # has changed if the string was padded to the left
-            start_index = string.index(substring)
-            end_index = start_index + len(substring) - 1
+        return self.predict_subsequences(strings, start_indices=start_indices,
+                                         end_indices=end_indices,
+                                         batch_size=batch_size)
+
+    def predict_subsequences(self, sequences, start_indices=None,
+                             end_indices=None, token_dicts=True,
+                             batch_size=DEFAULT_BATCH_SIZE):
+        '''
+        Return probability distributions, perplexities and entropies for
+        every token position in a specified subsequence of each sequence,
+        as well as the average perplexity and accuracy scores for each
+        subsequence.
+        The return value is a list of dicts, each dict containing the
+        above-mentioned information for a sequence-subsequence pair:
+        {"p": a list of len(subsequence) dicts, with the possible tokens
+              as keys and their probabilities as values,
+         "perpl": same as "p", but with character perplexities as values,
+         "s": an array of len(subsequence) entropies,
+         "substr-perpl": overall perplexity of the subsequence,
+         "acc": prediction accuracy on the subsequence}
+
+        If "token_dicts" is False, a numpy matrix containing the
+        predicted probabilities and perplexities is returned in "p" and
+        "perpl" respectively instead of lists of dicts.
+        Sequences are padded to the left or right as required if the 
+        sequence's prefix or suffix preceding and following the
+        start and end index respectively are shorter than the context
+        windows required by the model.
+
+        This method only works for character-level models, i.e. the
+        tokens of which are characters and the sequences of which are
+        strings.
+        '''
+        if isinstance(sequences, str):
+            sequences = [sequences]
+        if start_indices is None:
+            start_indices = [0] * len(sequences)
+        if end_indices is None:
+            end_indices = [len(seq) - 1 for seq in sequences]
+
+        contexts = []
+
+        for seq, start, end in zip(sequences, start_indices,
+                                   end_indices, strict=True):
+            assert start <= end
+            assert end < len(seq)
+            padded_seq = self.encoder.pad(seq, pad_before=start,
+                                          pad_after=end)
+
+            left_padding_len = max(self.encoder.left_context - start, 0)
+            start += left_padding_len
+            end += left_padding_len
 
             # crop each string
             contexts.append(
-                padded_string[start_index - self.encoder.left_context:
-                              end_index + self.encoder.right_context + 1])
+                padded_seq[start - self.encoder.left_context:
+                           end + self.encoder.right_context + 1])
+
+        subseqs = [c[self.encoder.left_context:
+                     -self.encoder.right_context] for c in contexts]
+        assert len(subseqs) > 0
+
+        num_preds = 0
+        for ss in subseqs:
+            assert len(ss) > 0
+            num_preds += len(ss)
 
         # predict; result is a combined array of predictions for
         # all substrings
-        num_preds = sum(len(substr) for substr in substrings)
         if num_preds >= MIN_PREDICT_BATCH:
             sequence_object = BiLSTM_Sequence(
                 contexts,
                 batch_size=min(num_preds, batch_size),
                 encoder=self.encoder, padded=False)
-            y = self.model.predict(x=sequence_object)
+            y = self.model.predict(x=sequence_object, verbose=0)
         else:
             y = []
             for s in contexts:
                 left_X, right_X, _ = self.encoder.encode(s, padded=False)
-                y.append(self.model([left_X, right_X], training=False)).numpy()
+                for pred in self.model([left_X, right_X], training=False):
+                    y.append(pred.numpy())
             y = np.array(y)
 
         # encode the true characters in the target substrings
-        joined_substrings = ''.join(substrings)
         yhat = []
         yhat_numeric = []
-        for c in joined_substrings:
-            yhat.append(self.encoder.output_encoder.encode(c))
-            yhat_numeric.append(self.encoder.output_encoder.to_int(c))
+        for token in chain(*subseqs):
+            yhat.append(self.encoder.output_encoder.encode(token))
+            yhat_numeric.append(self.encoder.output_encoder.to_int(token))
         yhat = np.array(yhat)
         yhat_numeric = np.array(yhat_numeric)
         y_numeric = y.argmax(axis=1)
-        true_probs = np.max(yhat * y, axis=1)
-        true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\
+        y[y < PerElementPerplexity.PROB_FLOOR] =\
             PerElementPerplexity.PROB_FLOOR
+        true_probs = np.max(yhat * y, axis=1)
 
         # split up prediction and target arrays into subarrays
         # that correspond to each string-substring pair
-        substr_indices = list(accumulate(len(substr)
-                                         for substr in substrings))
-        ys = np.split(y, substr_indices)
-        true_ps = np.split(true_probs, substr_indices)
-        y_numerics = np.split(y_numeric, substr_indices)
-        yhat_numerics = np.split(yhat_numeric, substr_indices)
+
+        # at what index does each substring begin?
+        subseq_indices = list(accumulate(len(ss)
+                                         for ss in subseqs))
+
+        # split, then remove empty split at the end
+        ys = np.split(y, subseq_indices)[:-1]
+        true_ps = np.split(true_probs, subseq_indices)[:-1]
+        y_numerics = np.split(y_numeric, subseq_indices)[:-1]
+        yhat_numerics = np.split(yhat_numeric, subseq_indices)[:-1]
 
         return_dicts = []
 
-        # generate output dicts and calculate summary metrics
-        # for each string-substring pair
+        # generate output dicts or matrices and calculate summary
+        # metrics for each string-substring pair
         for y_sub, true_p_sub, y_num_sub, yhat_num_sub \
                 in zip(ys, true_ps, y_numerics, yhat_numerics):
-            p_list = []
-            perpl_list = []
 
-            for token in y_sub:
-                p_list.append({self.encoder.code_to_character[i]: p
-                               for i, p in enumerate(token)})
-                perpl_list.append({self.encoder.code_to_character[i]: 1 / p
+            if token_dicts:
+                p_list = []
+                perpl_list = []
+
+                for token in y_sub:
+                    p_list.append({self.encoder.code_to_character[i]: p
                                    for i, p in enumerate(token)})
+                    perpl_list.append({self.encoder.code_to_character[i]: 1 / p
+                                       for i, p in enumerate(token)})
+            else:
+                p_list = y_sub
+                perpl_list = 1 / y_sub
 
             return_dicts.append(
                 {"p": p_list,
-                    "perpl": perpl_list,
-                    "s": -np.sum(y_sub * np.log2(y_sub), axis=1),
-                    "substr-perpl": 2 ** (-np.log2(true_p_sub).sum()
-                                          / len(y_sub)),
-                    "acc": sum(y_num_sub == yhat_num_sub)
+                 "perpl": perpl_list,
+                 "s": -np.sum(y_sub * np.log2(y_sub), axis=1),
+                 "substr-perpl": 2 ** (-np.log2(true_p_sub).sum()
+                                       / len(y_sub)),
+                 "acc": sum(y_num_sub == yhat_num_sub) / len(y_num_sub)
                  }
             )
 
         return return_dicts
 
-    def estimate_alternatives(self, sequence, target_index=None,
-                              return_metric='p'):
+    def estimate_alternatives(self, sequence, target_index=None):
         '''
         Return a dict containing all possible output tokens as keys
         and the probability of their occurrence at the target index as
@@ -807,7 +858,7 @@ class BiLSTM_Model:
         predict_on_string().
         '''
         target_pred = self.predict_on_string(sequence, target_index,
-                                             return_metric)
+                                             return_metric='p')
         return {self.encoder.code_to_character[i]: prob
                 for i, prob in enumerate(target_pred)}
 
@@ -896,68 +947,35 @@ class BiLSTM_Model:
         are needed instead of summary metrics, the predict_all() or
         predict_substrings() methods should be used.
         '''
+        min_len = (self.encoder.left_context
+                   + self.encoder.right_context + 1)
+
         if padded:
-            sequence = self.encoder.pad(sequence)
-        elif len(sequence) < (self.encoder.left_context +
-                              self.encoder.right_context + 1):
-            raise ValueError(f'Input sequence "{sequence}" is too short.')
-
-        yhat = []
-        yhat_numeric = []
-        for c in sequence[self.encoder.left_context:
-                          -self.encoder.right_context]:
-            yhat.append(self.encoder.output_encoder.encode(c))
-            yhat_numeric.append(self.encoder.output_encoder.to_int(c))
-        num_predictions = len(yhat)
-        yhat = np.array(yhat)
-        yhat_numeric = np.array(yhat_numeric)
-
-        if num_predictions >= MIN_PREDICT_BATCH:
-            sequence_object =\
-                BiLSTM_Sequence(sequence,
-                                batch_size=min(num_predictions, batch_size),
-                                encoder=self.encoder, padded=False)
-            y = self.model.predict(x=sequence_object)
+            preds = self.predict_subsequences([sequence], token_dicts=False,
+                                              batch_size=DEFAULT_BATCH_SIZE)
+        elif len(sequence) < min_len:
+            raise ValueError(f'Length of input sequence "{sequence}" is only'
+                             + f" {len(sequence)}, but must be at least "
+                             + f"{min_len}. Either evaluate a longer string, "
+                             + "or set padded=True.")
         else:
-            left_X, right_X, _ = self.encoder.encode(sequence, padded=False)
-            y = self.model([left_X, right_X], training=False).numpy()
-        import sys
-        try:
-            y_numeric = y.argmax(axis=1)
-        except AttributeError as err:
-            print(f"{y=}, ", err, file=sys.stderr)
-        correct_guesses = sum(y_numeric == yhat_numeric)
-
-        true_probs = np.max(yhat * y, axis=1)
-        true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\
-            PerElementPerplexity.PROB_FLOOR
-
-        sum_of_logs = -np.log2(true_probs).sum()
+            preds = self.predict_subsequences(
+                [sequence], start_indices=[self.encoder.left_context],
+                end_indices=[len(sequence)
+                             - (self.encoder.right_context + 1)],
+                token_dicts=False, batch_size=DEFAULT_BATCH_SIZE)
 
         if print_string:
-            print(self.encoder.decode(y))
+            print(self.encoder.decode(preds[0]['p']))
 
-        return (correct_guesses / num_predictions,      # accuracy
-                2 ** (sum_of_logs / num_predictions))   # perplexity
+        return preds[0]['acc'], preds[0]['substr-perpl']
 
-    def string_perplexity(self, sequence):
-        if len(sequence) < (self.encoder.left_context +
-                            self.encoder.right_context - 1):
-            raise ValueError(f'Input sequence "{sequence}" is too short.')
-
-        left_X, right_X, y = self.encoder.encode(sequence, padded=False)
-
-        num_predictions = len(y)
-
-        preds = self.model([left_X, right_X], training=False).numpy()
-
-        true_probs = np.max(y * preds, axis=1)
-        true_probs[true_probs < PerElementPerplexity.PROB_FLOOR] =\
-            PerElementPerplexity.PROB_FLOOR
-
-        sum_of_logs = -np.log2(true_probs).sum()
-
-        return (2 ** (sum_of_logs / num_predictions))
+    def string_perplexity(self, sequence, padded=False):
+        '''
+        Return average perplexity metric on input sequence,
+        like metrics_on_string().
+        '''
+        return self.metrics_on_string(sequence, padded=padded)[1]
 
 
 class BiLSTM_Encoder:
@@ -1216,13 +1234,13 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
             texts = [texts]
 
         if padded:
-            self.texts = (encoder.pad(t) for t in texts)
+            texts = (encoder.pad(t) for t in texts)
 
         # Skip inputs that are shorter than a
         # full context window.
         # This means texts of length 0 before padding,
         # or short texts if no padding was added.
-        self.texts = [t for t in self.texts
+        self.texts = [t for t in texts
                       if len(t) >= (self.context_length + 1)]
 
         # The lengths of the context windows are substracted from the

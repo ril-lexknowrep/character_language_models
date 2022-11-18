@@ -205,7 +205,7 @@ class InputEncoder(CharacterEncoder):
 
     def __init__(self, num_code_dict={},
                  add_start_char=False, add_end_char=False,
-                 add_mask_char=False, file=None):
+                 add_mask_char=False, file=None, mask_padding=False):
         '''
         Initialise encoder.
         If the path and name of a JSON save file are specified in 'file',
@@ -264,6 +264,7 @@ class InputEncoder(CharacterEncoder):
         super().load(fname)
         for key in self.ch_encodings_keys:
             self.encode(key)
+        self.ch_encodings[self.PADDING] = np.zeros(self.code_dimension)
 
 
 class OutputEncoder(CharacterEncoder):

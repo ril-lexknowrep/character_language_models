@@ -47,6 +47,12 @@ def main():
     progress_file = Path(training_name + '.progress.yml')
     summary_file = Path(training_name + '.summary.yml')
 
+    if corpus_dir:
+        corpus_files = [f for f in Path(corpus_dir).glob('**/*')
+                        if f.is_file()]
+    else:
+        corpus_files = [Path(f) for f in corpus_files]
+
     if progress_file.exists():
         (line_count, word_count, char_count,
          val_line_count, val_word_count, val_char_count,
@@ -55,12 +61,6 @@ def main():
         progress = {'name': training_name, 'start': lstm_model.timestamp()}
 
         line_counts = {}
-
-        if corpus_dir:
-            corpus_files = [f for f in Path(corpus_dir).glob('**/*')
-                            if f.is_file()]
-        else:
-            corpus_files = [Path(f) for f in corpus_files]
 
         wc_out = check_output(["wc", "-wml",
                                *[str(cf) for cf in corpus_files]]).rstrip()

@@ -9,12 +9,10 @@ import sys
 
 import itertools
 import more_itertools
+from contextlib import redirect_stdout
 
-from scipy.stats import entropy
-
-import tensorflow as tf
 import lstm_model
-from encode_characters import InputEncoder, OutputEncoder, character_to_features
+from encode_characters import InputEncoder, OutputEncoder
 
 
 def disable_print():
@@ -31,9 +29,8 @@ def perplexity(model, text):
     """Return perplexity."""
     PERPL_INDEX = 1
 
-    disable_print()
-    res = model.metrics_on_string(text)[PERPL_INDEX]
-    enable_print()
+    with redirect_stdout(sys.stderr):
+        res = model.metrics_on_string(text)[PERPL_INDEX]
 
     return res
 
@@ -64,27 +61,33 @@ def main():
     # --- init model
     input_enc = InputEncoder(file="input_encoder.json")
     output_enc = OutputEncoder(file="output_encoder.json")
-    disable_print()
-    MODEL_FILENAME = "bilstm_model_512.h5"
-    try:
-        bilstm_model = lstm_model.BiLSTM_Model.load(
-            MODEL_FILENAME, input_enc, output_enc)
-    except RuntimeError as e:
-        eprint()
-        eprint(e)
-        eprint(f"\nModelfile ({MODEL_FILENAME})'s version differs, loading with check_version=False")
-        bilstm_model = lstm_model.BiLSTM_Model.load(
-            MODEL_FILENAME, input_enc, output_enc,
-        check_version=False)
-    enable_print()
+
+    with redirect_stdout(sys.stderr):
+        MODEL_FILENAME = "bilstm_model_512.h5"
+        try:
+            bilstm_model = lstm_model.BiLSTM_Model.load(
+                MODEL_FILENAME, input_enc, output_enc)
+        except RuntimeError as e:
+            print()
+            print(e)
+            print(f"\nModelfile ({MODEL_FILENAME})'s version differs, loading with check_version=False")
+            bilstm_model = lstm_model.BiLSTM_Model.load(
+                MODEL_FILENAME, input_enc, output_enc,
+                check_version=False)
+
+    # context width required by language model
+    MIN_CONTEXT = bilstm_model.encoder.left_context
+
+    # context width to be evaluated on either side of target
+    EVALUATE_CONTEXT = 12
 
     # --- parameters
-    CS = 20 # = left context size = right context size
+#    CS = 20 # = left context size = right context size
             # min 15 kell, hogy legyen, a modell rendje miatt
             # XXX 16 esetén nem tökéletes eredményt ad...
             # XXX 5-tel hogy tudom megpróbálni??? ERROR: "Too short"
-    # XXX how to define padding to be consistent with BiLSTM_Model?
-    PADDING = ' ' * CS
+
+    CS = MIN_CONTEXT + EVALUATE_CONTEXT
 
     # define target point -- the 1st is the potential error to fix!
     # XXX should be updated to dict format (see below)
@@ -103,6 +106,7 @@ def main():
     DIGRAPH_HYPHEN_LABEL = "2"
     ORTHOGRAPHIC_HYPHEN_LABEL = "3"
     HYPHEN_PLUS_SPACE_LABEL = "4"
+    DASH_PLUS_SPACE_LABEL = "5"
 
     # dehyphenation -- regexes needed because of digraphs
     REPLACEMENTS = {
@@ -111,18 +115,26 @@ def main():
         r'\1': BREAKING_HYPHEN_LABEL,
         '': DIGRAPH_HYPHEN_LABEL
     }
+
     # asz- szony / asz-szony / aszszony / asszony
-    TARGET = re.compile(r'(.)-\n') # handle hyphens at end of line
-    TARGET_LENGTH = 3 # real length in chars!
+    TARGET = re.compile(r'(.)-\n')  # handle hyphens at end of line
+    TARGET_LENGTH = 3  # real length in chars!
 
     # --- stdin as char stream
     chars_iter = stdinchars()
 
     # padding
-    padded_text = itertools.chain(PADDING, chars_iter, PADDING)
+    padded_text = itertools.chain(
+        [bilstm_model.encoder.padding_token] * EVALUATE_CONTEXT, # this must be added, since window_iter is based on CS, not MIN_CONTEXT
+        bilstm_model.encoder.left_padding,  # adds MIN_CONTEXT left padding, as required by the model
+        chars_iter,
+        bilstm_model.encoder.right_padding,
+        [bilstm_model.encoder.padding_token] * EVALUATE_CONTEXT)
 
     # sliding window on padded char stream
-    window_iter = more_itertools.windowed(padded_text, 2 * CS + 1)
+    window_iter = more_itertools.windowed(padded_text, 2 * CS + TARGET_LENGTH)
+
+    DIGRAPHS = {'cs', 'dz', 'gy', 'ly', 'ny', 'sz', 'ty', 'zs'}
 
     for chars in window_iter:
         text = ''.join(chars)
@@ -135,18 +147,35 @@ def main():
             continue
 
         variations = []
-        for repl, label in REPLACEMENTS.items():
-            # replace only in target position
-            replaced = TARGET.sub(repl, targettext)
+
+        two_chars_before_hyphen = text[CS-1:CS+1]
+        two_chars_after_newline = text[-CS:-(CS-2)]
+
+        if targettext[0] == ' ':
+            replaced = targettext.replace('\n', ' ')
             vari = text[:CS] + replaced + text[CS+TARGET_LENGTH:]
             perpl = perplexity(bilstm_model, vari)
-            variations.append([targettext, replaced, vari, perpl, label])
+            variations.append([replaced, vari, perpl,
+                               DASH_PLUS_SPACE_LABEL])
+        else:
+            for repl, label in REPLACEMENTS.items():
+                if (label == DIGRAPH_HYPHEN_LABEL
+                    and (two_chars_before_hyphen not in DIGRAPHS
+                         or two_chars_after_newline not in DIGRAPHS
+                         or (two_chars_after_newline
+                             != two_chars_before_hyphen))):
+                    continue
+                # replace only in target position
+                replaced = TARGET.sub(repl, targettext)
+                vari = text[:CS] + replaced + text[CS+TARGET_LENGTH:]
+                perpl = perplexity(bilstm_model, vari)
+                variations.append([replaced, vari, perpl, label])
 
-        TARGET_INDEX, FOUND_INDEX, VARI_INDEX, PERPL_INDEX, LABEL_INDEX = 0, 1, 2, 3, 4
+        REPLACED_INDEX, VARI_INDEX, PERPL_INDEX, LABEL_INDEX = 0, 1, 2, 3
 
         if VERBOSE:
             print(']')
-            for _, _, vari, perpl, _ in variations:
+            for _, vari, perpl, _ in variations:
                 print()
                 print(f' vari="{vari}"')
                 print(f' mos_perpl={perpl}')
@@ -158,18 +187,21 @@ def main():
         #     perpl-k eltérése, mondjuk <10% vagy ilyesmi...
 
         if not EVAL:
-            print(best[FOUND_INDEX], end='')
+            print(best[REPLACED_INDEX], end='')
         else: # EVAL
             # XXX gigahekk, kézzel szedem le az újsort,
             #     amit a TARGET ptn megtalált,
             #     ezzel teljesen elrontva a TARGET általánosságát.
             #     persze itt az adott esetben éppen jó! :)
-            target_without_newline = best[TARGET_INDEX].rstrip('\n')
+            target_without_newline = targettext.rstrip('\n')
             print(f'{target_without_newline}\t{{{best[LABEL_INDEX]}}}')
 
         # skip chars processed as part of TARGET
         for i in range(TARGET_LENGTH - 1):
-            next(window_iter)
+            try:
+                next(window_iter)
+            except StopIteration:
+                print("Reached end of file and ADDED AN INCORRECT LABEL TO THE END OF THE LAST LINE!!!", file=sys.stderr)
 
     print()
 
@@ -190,11 +222,9 @@ def get_args():
         help='output labels for evaluation',
         action='store_true'
     )
- 
-    
+
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     main()
-

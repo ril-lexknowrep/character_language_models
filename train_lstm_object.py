@@ -197,6 +197,8 @@ def main():
         current_iteration = 0
         try:
             current_iteration += len(model_progress[m_id]['iterations'])
+        except ValueError:
+            pass
         except KeyError:
             pass
 

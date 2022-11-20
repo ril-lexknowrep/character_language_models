@@ -11,6 +11,7 @@ from subprocess import check_output
 import gc
 import argparse
 from pathlib import Path
+import shutil
 import logging
 from time import time
 
@@ -191,6 +192,14 @@ def main():
                     + f"{line_count:,} lines, {word_count:,} words and "
                     + f"{char_count:,} characters.")
 
+        # Establish for how many while iterations this model has been trained
+        # earlier. This is needed for saving backup checkpoints.
+        current_iteration = 0
+        try:
+            current_iteration += len(model_progress[m_id]['iterations'])
+        except KeyError:
+            pass
+
         while True:
             model_corpus_files = [c for c in corpus_files
                                   if starting_line < line_counts[str(c)]]
@@ -281,10 +290,6 @@ def main():
                          # at the end of a sequence of splits
                          if len(lines)]
 
-#                    input_texts = list(map(lambda x: ''.join(x).rstrip('\n'),
-#                                        input_text_lines))
-#                    input_texts = list(filter(lambda x: len(x) > 0, input_texts))
-
                 epoch_texts.extend(input_texts)
 
             batch_size = lstm_model.DEFAULT_BATCH_SIZE
@@ -329,6 +334,11 @@ def main():
                         + f'in {train_secs} seconds.')
             logger.info(f"Saving model file {str(model_file)}")
             bilstm_model.model.save(model_file)
+
+            # backup the saved model as a numbered checkpoint
+            # in case gradients should explode during training
+            shutil.copy(model_file, model_name + f'.{current_iteration}.ckp')
+            current_iteration += 1
 
             starting_line += lines_per_file
             processed_chars += sum(len(t) for t in epoch_texts)

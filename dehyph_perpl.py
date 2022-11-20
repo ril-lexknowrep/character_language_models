@@ -125,11 +125,13 @@ def main():
 
     # padding
     padded_text = itertools.chain(
-        [bilstm_model.encoder.padding_token] * EVALUATE_CONTEXT, # this must be added, since window_iter is based on CS, not MIN_CONTEXT
+        # the specific character is completely unimportant, since the
+        # EVALUATE CONTEXT first characters are never processed by the LSTM:
+        [' '] * EVALUATE_CONTEXT,  # this must be added, since window_iter is based on CS, not MIN_CONTEXT
         bilstm_model.encoder.left_padding,  # adds MIN_CONTEXT left padding, as required by the model
         chars_iter,
         bilstm_model.encoder.right_padding,
-        [bilstm_model.encoder.padding_token] * EVALUATE_CONTEXT)
+        [' '] * EVALUATE_CONTEXT)
 
     # sliding window on padded char stream
     window_iter = more_itertools.windowed(padded_text, 2 * CS + TARGET_LENGTH)

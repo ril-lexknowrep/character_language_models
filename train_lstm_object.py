@@ -123,9 +123,8 @@ def main():
         if m_id >= len(model_progress):
             # no progress yet on this model
             if (m_data.model_name is not None and
-                    Path(lstm_model.get_full_name(m_data.model_name)
-                         + '.h5').exists()):
-                model_name = lstm_model.get_full_name(m_data.model_name)
+                    Path(m_data.model_name + '.h5').exists()):
+                model_name = m_data.model_name
                 model_file = Path(model_name + '.h5')
                 bilstm_model = lstm_model.BiLSTM_Model.load(
                     model_file, input_enc, output_enc)

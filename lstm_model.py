@@ -17,9 +17,8 @@ from more_itertools import windowed
 
 MODULE_VERSION = "0.2.0"
 
-DEFAULT_BATCH_SIZE = 256
-CLIPNORM_THRESHOLD = 0.5
-CLIPVALUE_THRESHOLD = 1.0
+DEFAULT_BATCH_SIZE = 1024
+GLOBAL_CLIPNORM = 0.01
 
 # The Keras documentation for the Model.predict() method says:
 # "Computation is done in batches. This method is designed for batch
@@ -332,8 +331,7 @@ class BiLSTM_Model:
         # Largeish models (above a million or so parameters) tend to
         # exhibit exploding gradients during training with catastrophic
         # consequences if gradients are not clipped.
-        self.model.optimizer.clipnorm = CLIPNORM_THRESHOLD
-        self.model.optimizer.clipvalue = CLIPVALUE_THRESHOLD
+        self.model.optimizer.global_clipnorm = GLOBAL_CLIPNORM
 
         self.encoder = BiLSTM_Encoder(input_encoder, output_encoder,
                                       left_context=left_context,

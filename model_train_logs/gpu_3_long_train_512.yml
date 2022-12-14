@@ -1,0 +1,27 @@
+#corpus_files:
+#- train_files/sample.002.txt
+
+corpus_dir: lstm_input
+
+validation_files:
+- test_files/2.press_hu_promenad_003_2011.txt
+
+train_batch: 2048
+val_batch: 2048
+
+models:
+- model:
+  name: BiLSTM_Model_v0.2.0>w_30-30_lstm_512_dense_512_dropout_0.1>>2022-12-01_13.36.47
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 512
+
+  dense_layers:
+  - neurons: 512
+    dropout: 0.1

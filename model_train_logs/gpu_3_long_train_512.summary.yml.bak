@@ -1,0 +1,12 @@
+- model_name: BiLSTM_Model_v0.2.0>w_30-30_lstm_512_dense_512_dropout_0.1>>2022-12-01_13.36.47
+  parameters: 3023985
+  batch_size: 2048
+  total_time: 341149
+  chars_per_sec: 5498
+  words_per_sec: 755
+  final_loss: 0.13294941186904907
+  final_accuracy: 0.9609332084655762
+  final_perplexity: 1.1420315256263993
+  final_validation_loss: 0.19125650823116302
+  final_validation_accuracy: 0.9416839480400085
+  final_validation_perplexity: 1.2094768366904998

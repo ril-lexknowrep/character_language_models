@@ -1,0 +1,5 @@
+Loading 7-gram model
+Starting evaluation of 7-gram model at 2022-11-19_03.18.57
+Completed evaluation of 7-gram model at 2022-11-19_04.55.30
+Evaluation completed in 5793.455933332443
+Results for n='7': acc=0.8936506407574611, perpl=1.4244353217711205

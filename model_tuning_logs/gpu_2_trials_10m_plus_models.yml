@@ -1,0 +1,183 @@
+corpus_files:
+- train_files/sample.002.txt
+
+# corpus_dir:
+
+validation_files:
+- test_files/2.press_hu_promenad_003_2011.txt
+
+val_batch: 1024
+
+models:
+- model:
+  log_file: model9.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 768
+  - 512
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model9.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+  - 512
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 1024
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 1024
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 1024
+  - 512
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 1024
+  - 512
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 1280
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 1280
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 1536
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 1536
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 30
+  right_context: 30
+
+  lstm_layers:
+  - 1792
+
+  dense_layers:
+  - neurons: 1024
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder_with_mask_chars.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 1792
+
+  dense_layers:
+  - neurons: 1024
+  

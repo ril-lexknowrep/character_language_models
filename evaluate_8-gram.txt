@@ -1,0 +1,5 @@
+Loading 8-gram model
+Starting evaluation of 8-gram model at 2022-11-19_01.08.05
+Completed evaluation of 8-gram model at 2022-11-19_02.59.31
+Evaluation completed in 6685.543390512466
+Results for n='8': acc=0.901727418845804, perpl=1.4043391081567693

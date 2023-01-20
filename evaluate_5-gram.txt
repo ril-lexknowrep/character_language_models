@@ -1,0 +1,5 @@
+Loading 5-gram model
+Starting evaluation of 5-gram model at 2022-11-19_15.20.14
+Completed evaluation of 5-gram model at 2022-11-19_16.33.30
+Evaluation completed in 4396.205444812775
+Results for n='5': acc=0.8327936817598212, perpl=1.7070685140293729

@@ -20,7 +20,7 @@ from encode_characters import OutputEncoder
 
 MAX_SEGMENT_LENGTH = 4
 NUMBER_OF_SEGMENTS = 10000
-CORPUS_DIR = '/home/pgergo/ds_lexknowrep/lexknowrep/lstm_input/'
+CORPUS_DIR = '/path/to/corpus/'
 
 if not CORPUS_DIR.endswith('/'):
     CORPUS_DIR += '/'

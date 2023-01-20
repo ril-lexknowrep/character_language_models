@@ -1,0 +1,190 @@
+corpus_files:
+- train_files/sample.002.txt
+
+# corpus_dir:
+
+validation_files:
+- test_files/2.press_hu_promenad_003_2011.txt
+
+val_batch: 1024
+
+models:
+- model:
+  log_file: model1.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 512
+
+  dense_layers:
+  - neurons: 512
+
+- model:
+  log_file: model2.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+
+  dense_layers:
+  - neurons: 512
+
+- model:
+  log_file: model3.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model4.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 512
+
+  dense_layers:
+  - neurons: 512
+  - neurons: 256
+
+- model:
+  log_file: model5.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+
+  dense_layers:
+  - neurons: 512
+  - neurons: 256
+
+- model:
+  log_file: model6.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+
+  dense_layers:
+  - neurons: 768
+  - neurons: 256
+
+- model:
+  log_file: model7.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 512
+  - 256
+
+  dense_layers:
+  - neurons: 512
+
+- model:
+  log_file: model8.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+  - 384
+
+  dense_layers:
+  - neurons: 512
+
+- model:
+  log_file: model9.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+  - 384
+
+  dense_layers:
+  - neurons: 768
+
+- model:
+  log_file: model10.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 512
+  - 256
+
+  dense_layers:
+  - neurons: 512
+  - neurons: 256
+
+- model:
+  log_file: model11.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+  - 384
+
+  dense_layers:
+  - neurons: 512
+  - neurons: 256
+
+- model:
+  log_file: model12.log
+  input_encoder: input_encoder.json
+  output_encoder: output_encoder.json
+
+  left_context: 50
+  right_context: 50
+
+  lstm_layers:
+  - 768
+  - 384
+  
+  dense_layers:
+  - neurons: 768
+  - neurons: 256

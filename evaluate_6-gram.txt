@@ -1,0 +1,5 @@
+Loading 6-gram model
+Starting evaluation of 6-gram model at 2022-11-19_13.43.45
+Completed evaluation of 6-gram model at 2022-11-19_15.06.01
+Evaluation completed in 4935.609831094742
+Results for n='6': acc=0.8751763328276018, perpl=1.49549497889074

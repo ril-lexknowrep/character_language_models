@@ -1,0 +1,12 @@
+[[22  0]
+ [ 0  1]]
+
+              precision    recall  f1-score   support
+
+         {1}      1.000     1.000     1.000        22
+         {3}      1.000     1.000     1.000         1
+
+    accuracy                          1.000        23
+   macro avg      1.000     1.000     1.000        23
+weighted avg      1.000     1.000     1.000        23
+

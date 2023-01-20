@@ -1,11 +1,36 @@
-venv
 
+# see `README.md`
+venv-clm-dehyph
+
+# see Makefile: `make uncompress_data`
+# contained in character_language_models.7z (obsolete?)
 ngram_backward.model
 ngram_forward.model
-
+# contained in test_files/test_files.7z
 test_files/1.press_hu_nem_007.txt
 test_files/1.press_hu_nem_009.txt
 test_files/2.press_hu_nem_004_1998.txt
 test_files/2.press_hu_promenad_003_2010.txt
 test_files/2.press_hu_promenad_003_2011.txt
+
+# see Makefile: `make prepare`
+# contained in 5-gram-backward.model.7z
+5-gram-backward.model
+# contained in 5-gram-forward.model.7z
+5-gram-forward.model
+# contained in dehyphenation/scripts/corpus_word_counts.pickle.7z
+dehyphenation/scripts/corpus_word_counts.pickle
+# downloaded
+dehyphenation/scripts/hu_HU.aff
+dehyphenation/scripts/hu_HU.dic
+
+# intermediate eval files
+dehyphenation/eval/*/*INFO
+dehyphenation/eval/*/*anno
+dehyphenation/eval/*/*eval_data
+dehyphenation/eval/*/*gold
+dehyphenation/eval/*/*input
+
+*.swp
+__pycache__
 

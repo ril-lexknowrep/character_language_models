@@ -1,6 +1,12 @@
+## The code in this repository requires python >= 3.8 to run
 tensorflow
+keras
 numpy
 pandas
 more_itertools
 pyyaml
 h5py
+pyphen
+hunspell
+regex
+scikit-learn

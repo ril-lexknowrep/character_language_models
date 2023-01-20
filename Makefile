@@ -33,18 +33,16 @@ confusion_matrix:
 use_lm:
 	clear ; time python3 use_lm.py | grep -v "1/1" > use_lm.log
 
-dehyph-perpl: dehyph-perpl-plain dehyph-perpl-verbose dehyph-perpl-eval
+# ----- dehyphenation eval
 
-dehyph-perpl-plain:
-	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py > dehyph_test_output.txt
-dehyph-perpl-verbose:
-	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py -v > dehyph_perpl.log
-dehyph-perpl-eval:
-	clear ; time cat dehyph_test_input.txt | python3 dehyph_perpl.py -e > dehyph_perpl.eval
+prepare:
+	7z x -aoa 5-gram-forward.model.7z ; 7z x -aoa 5-gram-backward.model.7z
+	cd dehyphenation/scripts ; 7z x -aoa corpus_word_counts.pickle.7z
+	cd dehyphenation ; make get_hunspell_data
 
-# -----
+eval-small:
+	cd dehyphenation ; scripts/eval.sh 50
 
-# obsolete
-dehyph:
-	clear ; time python3 dehyph.py | grep -v "[0-9]/[0-9].*ETA:" > dehyph.log
+eval:
+	cd dehyphenation ; scripts/eval.sh 100000
 

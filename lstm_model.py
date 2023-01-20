@@ -721,7 +721,7 @@ class BiLSTM_Model:
 
         start_indices = []
         end_indices = []
-        for ss, s in zip(substrings, strings, strict=True):
+        for ss, s in zip(substrings, strings):
             start = s.index(ss)
             start_indices.append(start)
             end_indices.append(start + len(ss) - 1)
@@ -769,7 +769,7 @@ class BiLSTM_Model:
         contexts = []
 
         for seq, start, end in zip(sequences, start_indices,
-                                   end_indices, strict=True):
+                                   end_indices):
             assert start <= end
             assert end < len(seq)
             padded_seq = self.encoder.pad(seq, pad_before=start,

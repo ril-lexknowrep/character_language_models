@@ -18,6 +18,16 @@ test_files/2.press_hu_promenad_003_2011.txt
 5-gram-backward.model
 # contained in 5-gram-forward.model.7z
 5-gram-forward.model
+# to be downloaded
+7-gram-models.7z
+# contained in 5-gram-models.7z
+7-gram-backward.model
+7-gram-forward.model
+# to be downloaded
+bilstm_model_1280.7z
+# contained in bilstm_model_1280.7z
+BiLSTM_Model_v0.2.0>w_30-30_lstm_1280_dense_1024_dropout_0.1>>2022-11-24_01.23.36.3_epoch.h5
+
 # contained in dehyphenation/scripts/corpus_word_counts.pickle.7z
 dehyphenation/scripts/corpus_word_counts.pickle
 # downloaded

@@ -54,11 +54,11 @@ def main():
     EVAL = args.eval
 
     # --- init model
-    input_enc = InputEncoder(file=f"{DIR}/input_encoder.json")
+    input_enc = InputEncoder(file=f"{DIR}/input_encoder_with_mask_chars.json")
     output_enc = OutputEncoder(file=f"{DIR}/output_encoder.json")
 
     with redirect_stdout(sys.stderr):
-        MODEL_FILENAME = f"{DIR}/bilstm_model_512.h5"
+        MODEL_FILENAME = f"{DIR}/BiLSTM_Model_v0.2.0>w_30-30_lstm_1280_dense_1024_dropout_0.1>>2022-11-24_01.23.36.3_epoch.h5"
         try:
             bilstm_model = lstm_model.BiLSTM_Model.load(
                 MODEL_FILENAME, input_enc, output_enc)

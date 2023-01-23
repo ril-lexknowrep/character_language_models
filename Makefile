@@ -35,8 +35,15 @@ use_lm:
 
 # ----- dehyphenation eval
 
+# un7z models + download and un7z large models + ...
 prepare:
-	7z x -aoa 5-gram-forward.model.7z ; 7z x -aoa 5-gram-backward.model.7z
+	7z x -aoa 5-gram-forward.model.7z
+	7z x -aoa 5-gram-backward.model.7z
+	gdown "1mgHWDxeJktYVD66z0mFwApLBa9Ghlesu"
+	gdown "1NPsiz8M7_Lpff6-aJnWKa80IKz5vfm_q"
+	7z x -aoa 7-gram-models.7z 
+	7z x -aoa bilstm_model_1280.7z 
+	rm -f bilstm_model_1280.7z 7-gram-models.7z 
 	cd dehyphenation/scripts ; 7z x -aoa corpus_word_counts.pickle.7z
 	cd dehyphenation ; make get_hunspell_data
 

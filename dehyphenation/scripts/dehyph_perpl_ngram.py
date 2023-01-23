@@ -55,8 +55,8 @@ def main():
     EVAL = args.eval
 
     # --- init model
-    MODEL_FORWARD = f'{DIR}/5-gram-forward.model'
-    MODEL_BACKWARD = f'{DIR}/5-gram-backward.model'
+    MODEL_FORWARD = f'{DIR}/7-gram-forward.model'
+    MODEL_BACKWARD = f'{DIR}/7-gram-backward.model'
     with open(MODEL_FORWARD, 'rb') as savefile:
         trie_forward = pickle.load(savefile)
     with open(MODEL_BACKWARD, 'rb') as savefile:

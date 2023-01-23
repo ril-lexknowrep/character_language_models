@@ -10,3 +10,4 @@ pyphen
 hunspell
 regex
 scikit-learn
+gdown

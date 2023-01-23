@@ -5,6 +5,8 @@ Character-based language models and an application: dehyphenation.
 
 This section is to reproduce the results presented in the MSZNY 2023 paper titled _Korpusztisztítás és sorvégi kötőjelek kezelése karakteralapú neurális nyelvmodellel_. 
 
+[Use this commit, please: `9de4f92`.](https://github.com/ril-lexknowrep/character_language_models/tree/9de4f92750cac17082be822615fc947caaf9362a)
+
 1. preparation
    ```bash
    python3 -m venv venv-clm-dehyph

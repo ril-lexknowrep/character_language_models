@@ -286,7 +286,7 @@ class OutputEncoder(CharacterEncoder):
         '''Return one-hot vector representation for the character'''
         # Rare output characters are identified as a generic OOV
         # character with code 0.
-        return self.diag_matrix[self.num_code_dict.get(character, 0)]
+        return self.diag_matrix[self.num_code_dict.get(character, 0)].copy()
 
     def to_int(self, character):
         '''Return the integer code for the character, 0 for OOV'''

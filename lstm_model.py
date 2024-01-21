@@ -782,7 +782,7 @@ class BiLSTM_Model:
             # crop each string
             contexts.append(
                 padded_seq[start - self.encoder.left_context:
-                           end + self.encoder.right_context + 1])
+                           end + self.encoder.right_context + 1].copy())
 
         subseqs = [c[self.encoder.left_context:
                      -self.encoder.right_context] for c in contexts]
@@ -1270,20 +1270,20 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
         self.encoder = encoder
         self.padded = padded
 
-        if encoder.char_to_int is None:
-            self.left_X = np.zeros([batch_size,
-                                    encoder.left_context,
-                                    encoder.input_encoder.code_dimension])
-            self.right_X = np.zeros([batch_size,
-                                    encoder.right_context,
-                                    encoder.input_encoder.code_dimension])
-        else:  # an Embedding layer is used
-            self.left_X = np.zeros([batch_size,
-                                    encoder.left_context])
-            self.right_X = np.zeros([batch_size,
-                                    encoder.right_context])
+        # if encoder.char_to_int is None:
+        #     self.left_X = np.zeros([batch_size,
+        #                             encoder.left_context,
+        #                             encoder.input_encoder.code_dimension])
+        #     self.right_X = np.zeros([batch_size,
+        #                             encoder.right_context,
+        #                             encoder.input_encoder.code_dimension])
+        # else:  # an Embedding layer is used
+        #     self.left_X = np.zeros([batch_size,
+        #                             encoder.left_context])
+        #     self.right_X = np.zeros([batch_size,
+        #                             encoder.right_context])
 
-        self.y = np.zeros([batch_size, encoder.output_encoder.code_dimension])
+        # self.y = np.zeros([batch_size, encoder.output_encoder.code_dimension])
 
         # Determine starting positions of batches.
         # Note that the positions refer to the index of a full context
@@ -1309,12 +1309,11 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
             if current_text == len(self.text_lengths):
                 # All texts done
                 break
-
     def __len__(self):
         return math.ceil(sum(self.text_lengths) / self.batch_size)
 
     def __getitem__(self, idx):
-        left_X, right_X, y = self.left_X, self.right_X, self.y
+#        left_X, right_X, y = self.left_X, self.right_X, self.y
         start_text, start_pos = self.batch_starts[idx]
 
         if (idx == -1) or (idx == len(self) - 1):
@@ -1353,24 +1352,33 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
             # final context window in the text, the context length
             # must be added so that the required number of full
             # context windows are fed to the encoder.
-            self.encoder.encode(self.texts[start_text][start_pos:end_pos +
+            left_X, right_X, y = self.encoder.encode(self.texts[start_text][start_pos:end_pos +
                                                        self.context_length],
-                                call_by_reference=(left_X, right_X, y),
+#                                call_by_reference=(left_X, right_X, y),
                                 padded=False)
         else:
+            left_Xs = []
+            right_Xs = []
+            ys = []
             # Encode the final substring of the first text,
             # the initial substring of the final text,
             # and any entire texts in between.
-            self.encoder.encode(self.texts[start_text][start_pos:],
-                                call_by_reference=(left_X, right_X, y),
+            left_X, right_X, y = self.encoder.encode(self.texts[start_text][start_pos:],
+#                                call_by_reference=(left_X, right_X, y),
                                 padded=False)
+            left_Xs.append(left_X)
+            right_Xs.append(right_X)
+            ys.append(y)
             window_index = self.text_lengths[start_text] - start_pos
 
             for j in range(start_text + 1, end_text):
-                self.encoder.encode(self.texts[j],
-                                    call_by_reference=(left_X, right_X, y),
+                left_X, right_X, y = self.encoder.encode(self.texts[j],
+#                                    call_by_reference=(left_X, right_X, y),
                                     start=window_index,
                                     padded=False)
+                left_Xs.append(left_X)
+                right_Xs.append(right_X)
+                ys.append(y)
                 window_index += self.text_lengths[j]
 
             if end_pos != 0:
@@ -1382,12 +1390,17 @@ class BiLSTM_Sequence(tf.keras.utils.Sequence):
                 # The text before end_text has been processed at the end of
                 # the previous for loop, so if end_pos is 0, this batch is
                 # already complete at this point.
-                self.encoder.encode(self.texts[end_text][:end_pos +
+                left_X, right_X, y = self.encoder.encode(self.texts[end_text][:end_pos +
                                                          self.context_length],
-                                    call_by_reference=(left_X, right_X, y),
+#                                    call_by_reference=(left_X, right_X, y),
                                     start=window_index,
                                     padded=False)
-
+                left_Xs.append(left_X)
+                right_Xs.append(right_X)
+                ys.append(y)
+        left_X = np.concatenate(left_Xs)
+        right_X = np.concatenate(right_Xs)
+        y = np.concatenate(ys)
         return ([left_X, right_X], y)
 
 
